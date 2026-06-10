@@ -326,56 +326,6 @@ function NS.CreateOptions()
     moverCheck:SetChecked(false)
     y = y + 36
 
-    -- ===== Glow color picker =====
-    local glowLabel = c:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    glowLabel:SetPoint("TOPLEFT", 10, -y - 6)
-    glowLabel:SetText("Glow Color:")
-
-    local swatch = CreateFrame("Button", "OneJobOwlGlowSwatch", c)
-    swatch:SetSize(20, 20)
-    swatch:SetPoint("TOPLEFT", 85, -y)
-    local swatchBorder = swatch:CreateTexture(nil, "BACKGROUND")
-    swatchBorder:SetAllPoints()
-    swatchBorder:SetColorTexture(1, 1, 1, 1)
-    local swatchColor = swatch:CreateTexture(nil, "ARTWORK")
-    swatchColor:SetPoint("TOPLEFT", 2, -2)
-    swatchColor:SetPoint("BOTTOMRIGHT", -2, 2)
-
-    local function UpdateSwatch()
-        local gc = OneJobOwlDB.glowColor or { r = 1, g = 0.2, b = 0.1, a = 0.7 }
-        swatchColor:SetColorTexture(gc.r, gc.g, gc.b, 1)
-    end
-    UpdateSwatch()
-
-    swatch:SetScript("OnClick", function()
-        local gc = OneJobOwlDB.glowColor or { r = 1, g = 0.2, b = 0.1, a = 0.7 }
-        local function Apply(r, g, b, a)
-            NS.SetGlowColor(r, g, b, a)
-            UpdateSwatch()
-        end
-        -- classic-era ColorPickerFrame API (opacity slider is inverted: 0 = opaque)
-        ColorPickerFrame.func = function()
-            local r, g, b = ColorPickerFrame:GetColorRGB()
-            local a = OpacitySliderFrame and (1 - OpacitySliderFrame:GetValue()) or gc.a
-            Apply(r, g, b, a)
-        end
-        ColorPickerFrame.opacityFunc = ColorPickerFrame.func
-        ColorPickerFrame.hasOpacity = true
-        ColorPickerFrame.opacity = 1 - (gc.a or 0.7)
-        ColorPickerFrame.previousValues = { r = gc.r, g = gc.g, b = gc.b, opacity = 1 - (gc.a or 0.7) }
-        ColorPickerFrame.cancelFunc = function(prev)
-            Apply(prev.r, prev.g, prev.b, 1 - (prev.opacity or 0.3))
-        end
-        ColorPickerFrame:SetColorRGB(gc.r, gc.g, gc.b)
-        ColorPickerFrame:Hide() -- forces OnShow to re-read values if already open
-        ColorPickerFrame:Show()
-    end)
-
-    local glowHint = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    glowHint:SetPoint("LEFT", swatch, "RIGHT", 8, 0)
-    glowHint:SetText("|cffaaaaaaClick to change. Use 'Unlock button' above to preview it live.|r")
-    y = y + 32
-
     local scaleSlider = CreateFrame("Slider", "OneJobOwlScaleSlider", c, "OptionsSliderTemplate")
     scaleSlider:SetPoint("TOPLEFT", 15, -y)
     scaleSlider:SetWidth(220)
@@ -546,7 +496,6 @@ function NS.CreateOptions()
         combatCheck:SetChecked(OneJobOwlDB.combatOnly)
         slider:SetValue(OneJobOwlDB.threshold or 5)
         scaleSlider:SetValue(OneJobOwlDB.buttonScale or 1)
-        UpdateSwatch()
         SetMode(OneJobOwlDB.mode or "BUTTON")
         RefreshList()
     end
