@@ -26,17 +26,16 @@ A lightweight Classic WoW (TBC) addon that shames Moonkins for letting **Improve
 
 ## Slash Commands
 
-| Command              | Description |
-|----------------------|-----------|
-| `/ojo`               | Open options panel |
-| `/ojo test`          | Send a test shame message |
-| `/ojo button`        | Preview the shame button |
-| `/shame <name>`      | Set your Moonkin (whisper target) |
-| `/shame target`      | Set Moonkin from current target |
-| `/clearshame`        | Clear Moonkin target |
-| `/fftarget`          | Watch FF on current target (clears after combat) |
-| `/fftarget clear`    | Stop watching specific enemy |
-| `/ojo scan`          | Debug: show current target's debuffs |
+| Command         | Description |
+|-----------------|-----------|
+| `/ojo`          | Open options panel |
+| `/ojo test`     | Send a test shame message |
+| `/ojo button`   | Preview the shame button |
+| `/shame <name>` | Set your Moonkin (whisper target) |
+| `/shame target` | Set Moonkin from current target |
+| `/shameclear`   | Clear Moonkin target |
+| `/fftarget`     | Watch FF on current target (clears after combat) |
+| `/ffclear`      | Stop watching specific enemy |
 
 ## Configuration
 
@@ -58,13 +57,13 @@ Open the options panel with `/ojo`:
 ### Shame Button
 - Unlock to drag
 - Button scale
-- Glow color
 
 ### Shame Messages
 - Edit, add, or delete messages
 - Restore defaults
 
 ## Default Shame Messages
+
 Includes dozens of funny roasts like:
 - "You had one job, owl..."
 - "Laser chicken, your Improved Faerie Fire is missing again."
@@ -83,5 +82,4 @@ Includes dozens of funny roasts like:
 ---
 
 Enjoy keeping those Moonkins honest! 🦉
-
 Feedback and suggestions are welcome.
