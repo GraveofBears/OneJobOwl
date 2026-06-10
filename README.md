@@ -1,6 +1,5 @@
 # 🦉OneJobOwl🦉
 
-**"You had one job, owl."**
 
 A lightweight Classic WoW (TBC) addon that shames Moonkins for letting **Improved Faerie Fire** fall off.
 
