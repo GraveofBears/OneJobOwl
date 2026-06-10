@@ -1,0 +1,11 @@
+## Interface: 20505
+## Title: OneJobOwl
+## Notes: Tracks Improved Faerie Fire and reminds the owl who had one job.
+## Author: Gravebear
+## Version: 1.0.0
+## SavedVariables: OneJobOwlDB
+
+OneJobOwl_Shames.lua
+OneJobOwl_Button.lua
+OneJobOwl.lua
+OneJobOwl_Options.lua
