@@ -1,4 +1,4 @@
-# 🦉OneJobOwl🦉
+# OneJobOwl 🦉
 
 
 A lightweight Classic WoW (TBC) addon that shames Moonkins for letting **Improved Faerie Fire** fall off.
