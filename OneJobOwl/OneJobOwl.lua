@@ -10,8 +10,6 @@
 --   or when its remaining time drops below your threshold. A fresh pull
 --   where FF hasn't gone up yet will NOT trigger (set threshold to 0 if
 --   you only want actual fall-offs, not "about to expire" warnings).
---   /ojo scan lists your target's current debuffs if you need to verify
---   what the addon is seeing.
 
 local ADDON_NAME, NS = ...
 
@@ -344,40 +342,11 @@ end
 SLASH_ONEJOBOWL1 = "/ojo"
 SlashCmdList["ONEJOBOWL"] = function(msg)
     msg = msg or ""
-    local cmd, rest = msg:match("^(%S*)%s*(.-)$")
-    cmd = cmd:lower()
-    if cmd == "set" and rest ~= "" then
-        SetMoonkin(rest)
-    elseif cmd == "clear" then
-        ClearMoonkin()
-    elseif cmd == "test" then
+    local cmd = msg:match("^(%S*)"):lower()
+    if cmd == "test" then
         NS.SendShame()
     elseif cmd == "button" then
         if NS.ShowShameButton then NS.ShowShameButton() end -- preview the button
-    elseif cmd == "enemy" then
-        if rest:lower() == "clear" then
-            NS.ClearFFEnemy("manual")
-        else
-            NS.SetFFEnemyFromTarget()
-        end
-    elseif cmd == "scan" then
-        -- debug: list the target's debuffs so detection can be verified
-        if not UnitExists("target") then
-            print("|cffff8800[OneJobOwl]|r No target to scan.")
-            return
-        end
-        print("|cffff8800[OneJobOwl]|r Debuffs on " .. (UnitName("target") or "target") .. ":")
-        local found = false
-        for i = 1, 40 do
-            local name, _, _, _, _, expirationTime, _, _, _, spellId = UnitDebuff("target", i)
-            if not name then break end
-            found = true
-            local rem = (expirationTime and expirationTime > 0)
-                and string.format("%.1fs left", expirationTime - GetTime()) or "no duration"
-            local hit = (FF_SPELL_IDS[spellId] or name:find("^Faerie Fire")) and " |cff44ff44<- TRACKED|r" or ""
-            print(("  %s (id %d, %s)%s"):format(name, spellId or 0, rem, hit))
-        end
-        if not found then print("  (none)") end
     else
         OpenOptions()
     end
@@ -396,35 +365,24 @@ SlashCmdList["OJOSHAME"] = function(msg)
         SetMoonkin(msg)
     elseif NS.HasMoonkinSet() then
         print("|cffff8800[OneJobOwl]|r Current moonkin on the hook: " .. OneJobOwlDB.moonkinName
-            .. ". Use /shame <name>, /shame target, or /clearshame.")
+            .. ". Use /shame <name>, /shame target, or /shameclear.")
     else
         print("|cffff8800[OneJobOwl]|r No moonkin set. Use /shame <name> or target them and type /shame target.")
     end
 end
 
-SLASH_OJOCLEARSHAME1 = "/clearshame"
-SlashCmdList["OJOCLEARSHAME"] = function() ClearMoonkin() end
+SLASH_OJOSHAMECLEAR1 = "/shameclear"
+SlashCmdList["OJOSHAMECLEAR"] = function() ClearMoonkin() end
 
--- /fftarget        -> watch your current target's FF (clears after combat)
--- /fftarget clear  -> stop watching
+-- /fftarget  -> watch your current target's FF (clears after combat)
 SLASH_OJOFFTARGET1 = "/fftarget"
-SlashCmdList["OJOFFTARGET"] = function(msg)
-    msg = (msg or ""):gsub("^%s+", ""):gsub("%s+$", ""):lower()
-    if msg == "clear" then
-        if NS.GetFFEnemyName() then
-            NS.ClearFFEnemy("manual")
-        else
-            print("|cffff8800[OneJobOwl]|r No FF enemy is set.")
-        end
-    elseif msg == "" then
-        NS.SetFFEnemyFromTarget()
-    else
-        print("|cffff8800[OneJobOwl]|r Usage: /fftarget (sets from current target) or /fftarget clear")
-    end
+SlashCmdList["OJOFFTARGET"] = function()
+    NS.SetFFEnemyFromTarget()
 end
 
-SLASH_OJOCLEARFFTARGET1 = "/clearfftarget"
-SlashCmdList["OJOCLEARFFTARGET"] = function()
+-- /ffclear   -> stop watching the FF enemy
+SLASH_OJOFFCLEAR1 = "/ffclear"
+SlashCmdList["OJOFFCLEAR"] = function()
     if NS.GetFFEnemyName() then
         NS.ClearFFEnemy("manual")
     else

@@ -249,14 +249,14 @@ function NS.CreateOptions()
     enemyNote:SetPoint("TOPLEFT", 15, -y)
     enemyNote:SetWidth(510)
     enemyNote:SetJustifyH("LEFT")
-    enemyNote:SetText("|cffaaaaaaWatched by GUID via your target, focus, or its nameplate, so you can target adds freely. Auto-clears when combat ends or it dies. Chat: /fftarget sets from target, /fftarget clear (or /clearfftarget) clears.|r")
+    enemyNote:SetText("|cffaaaaaaWatched by GUID via your target, focus, or its nameplate, so you can target adds freely. Auto-clears when combat ends or it dies. Chat: /fftarget sets from target, /ffclear clears.|r")
     y = y + 42
 
     local chatNote = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     chatNote:SetPoint("TOPLEFT", 10, -y)
     chatNote:SetWidth(520)
     chatNote:SetJustifyH("LEFT")
-    chatNote:SetText("|cffaaaaaaType a name and press Enter to save it, or use the Target / Clear buttons. From chat: /shame Name, /shame target (handles weird-character names), /clearshame. /ojo test sends a test message.|r")
+    chatNote:SetText("|cffaaaaaaType a name and press Enter to save it, or use the Target / Clear buttons. From chat: /shame Name, /shame target (handles weird-character names), /shameclear. /ojo test sends a test message.|r")
     y = y + 32
 
     -- =====================================================================
