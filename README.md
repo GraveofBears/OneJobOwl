@@ -8,7 +8,7 @@ A Classic WoW (TBC) addon that shames Moonkins for letting **Improved Faerie Fir
   - **Shame Button** (default) — A moonkin owl appears when IFF drops. Click to shame.
   - **Auto-Shame** — Automatically sends a message (no button).
 - **"I Am Owl" Mode**: Self-tracking mode to grade your own IFF uptime with performance reports.
-- **Customizable Messaging**: Edit and manage both your Shame and Praise messages.
+- **Customizable Messaging**: Edit and manage your Shame messages.
 - **Support for Whispers/Chat Channels**: Send reports/shames via Whisper, Say, Party, or Raid.
 - **Advanced Tracking**: Watch specific bosses by GUID, configurable sound/thresholds, and tracking scope.
 - **Draggable UI**: Fully draggable shame button with adjustable scale.
@@ -62,8 +62,6 @@ Open the options panel with `/ojo`:
 ## Notes
 
 - **"I Am Owl" Mode**: When enabled, the addon tallies your uptime, refresh efficiency, and downtime, providing a letter-grade report at the end of combat.
-- Works best when the Moonkin has the addon too (for receiving whispers), but not required.
-- The FF Enemy feature (`/fftarget`) is perfect for bosses with adds.
 - All settings are saved per character.
 
 ## Author
