@@ -1,7 +1,4 @@
-<div align="center">
-  <img src="https://noobtrap.eu/images/crystallights/Moonkin2.png" width="400">
-</div>
-
+![](https://noobtrap.eu/images/crystallights/Moonkin2.png)
 
 A Classic WoW (TBC) addon that shames Moonkins for letting **Improved Faerie Fire** fall off.
 
