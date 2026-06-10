@@ -29,7 +29,8 @@ NS.defaults = {
     threshold = 5,
     channel = "WHISPER",     -- default: whisper your designated moonkin
     moonkinName = "",
-    mode = "BUTTON",         -- "BUTTON" = show shame button, "AUTO" = auto-send
+    mode = "BUTTON",         -- "BUTTON" = shame button, "AUTO" = auto-send, "IAMOWL" = praise mode
+    iamowlReport = true,     -- I Am Owl: post the after-battle report when combat ends
     sound = 8959,            -- soundkit ID played when the button appears (8959 = Raid Warning)
     trackScope = "BOSS",     -- "BOSS" (skull only), "ELITE" (bosses+elites), "ALL"
     combatOnly = true,       -- only alert while you are in combat
@@ -107,6 +108,7 @@ end
 -- a friend while solo) isn't wiped the instant a roster event fires; we only
 -- clear on an actual departure.
 local moonkinSeenInGroup = false
+function NS.ResetMoonkinSeenFlag() moonkinSeenInGroup = false end
 
 local function IsUnitTheMoonkin(unit)
     if not UnitExists(unit) then return false end
@@ -169,6 +171,7 @@ local function GetIFFRemaining(unit)
     end
     return nil
 end
+NS.GetIFFRemaining = GetIFFRemaining
 
 function NS.SendShame()
     local pool = OneJobOwlDB.shames
@@ -212,6 +215,7 @@ end
 function NS.ResetTargetState()
     iffSeen = false
     if NS.HideShameButton then NS.HideShameButton() end
+    if NS.ResetIamOwlTracking then NS.ResetIamOwlTracking() end   -- <-- Add this
 end
 
 -- Does the current target matter enough to shame over?
@@ -262,6 +266,16 @@ local function CheckIFF(unit)
     end
 
     local rem = GetIFFRemaining(unit)
+
+    -- I Am Owl praise mode keeps its own books and handles its own feedback;
+    -- the button / auto-shame paths stay out of its way.
+    if NS.IsIamOwlMode and NS.IsIamOwlMode() then
+        if NS.IamOwl_Scan then NS.IamOwl_Scan(unit, rem) end
+        iffSeen = (rem ~= nil)
+        if NS.HideShameButton then NS.HideShameButton() end
+        return
+    end
+
     if rem == nil then
         -- IFF not on target. Only shame if we actually saw it up before.
         if iffSeen then
@@ -320,6 +334,7 @@ frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 frame:RegisterEvent("UNIT_AURA")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 frame:RegisterEvent("GROUP_ROSTER_UPDATE")
 frame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
@@ -342,9 +357,14 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         elseif arg1 == "target" then
             CheckIFF("target")
         end
+    elseif event == "PLAYER_REGEN_DISABLED" then
+        -- combat started: I Am Owl begins a fresh scorecard
+        if NS.IamOwl_StartCombat then NS.IamOwl_StartCombat() end
     elseif event == "PLAYER_REGEN_ENABLED" then
         -- combat over: the FF enemy's shift is done
         if ffEnemy then NS.ClearFFEnemy("combat ended") end
+        -- and I Am Owl posts the after-action report
+        if NS.IamOwl_EndCombat then NS.IamOwl_EndCombat() end
     elseif event == "GROUP_ROSTER_UPDATE" then
         -- someone joined/left (or we did): drop the moonkin if they're gone
         NS.CheckMoonkinGroupMembership()
@@ -375,14 +395,14 @@ function NS.SetMoonkin(name)
     OneJobOwlDB.moonkinName = name
     print("|cffff8800[OneJobOwl]|r Moonkin set to: " .. name .. ". Whispers incoming.")
     -- if they're already in our group, remember that so a later exit clears them
-    if NS.CheckMoonkinGroupMembership then NS.CheckMoonkinGroupMembership() end
+    NS.CheckMoonkinGroupMembership()
     if NS.RefreshOptions then NS.RefreshOptions() end
 end
 local SetMoonkin = NS.SetMoonkin
 
 function NS.ClearMoonkin()
     OneJobOwlDB.moonkinName = ""
-    moonkinSeenInGroup = false
+    NS.ResetMoonkinSeenFlag()
     print("|cffff8800[OneJobOwl]|r Moonkin cleared. Back to self-shame mode.")
     if NS.RefreshOptions then NS.RefreshOptions() end
 end

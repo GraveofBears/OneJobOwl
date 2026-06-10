@@ -8,4 +8,5 @@
 OneJobOwl_Shames.lua
 OneJobOwl_Button.lua
 OneJobOwl.lua
+OneJobOwl_IamOwl.lua
 OneJobOwl_Options.lua
