@@ -14,7 +14,7 @@ A lightweight Classic WoW (TBC) addon that shames Moonkins for letting **Improve
 - Supports whispering a designated Moonkin (raid lead mode)
 - Can watch a specific boss by GUID (great for multi-target fights)
 - Configurable sound, threshold, tracking scope (bosses only / elites / everything)
-- Draggable shame button with glow color and scale options
+- Draggable shame button with scale options
 - Classic-friendly options panel
 
 ## Installation
