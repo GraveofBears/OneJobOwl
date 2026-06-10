@@ -8,7 +8,7 @@ A lightweight Classic WoW (TBC) addon that shames Moonkins for letting **Improve
 
 - Tracks **Improved Faerie Fire** (and regular Faerie Fire) on your target
 - Two modes:
-  - **Shame Button** (default) — A cute moonkin owl appears when IFF drops. Click to shame.
+  - **Shame Button** (default) — A moonkin owl appears when IFF drops. Click to shame.
   - **Auto-Shame** — Automatically sends a message (no button)
 - Fully customizable shame messages
 - Supports whispering a designated Moonkin (raid lead mode)
