@@ -99,6 +99,65 @@ function NS.HasMoonkinSet()
     return OneJobOwlDB.moonkinName and OneJobOwlDB.moonkinName ~= ""
 end
 
+-- ===== Keep the shame target tied to your group =====
+-- A designated moonkin should only stick while they're actually grouped with
+-- us. If they leave the raid/party -- or we do -- the name clears so we don't
+-- keep whispering someone who's gone. We remember whether the moonkin has been
+-- SEEN in the group, so a deliberately-set out-of-group target (e.g. whispering
+-- a friend while solo) isn't wiped the instant a roster event fires; we only
+-- clear on an actual departure.
+local moonkinSeenInGroup = false
+
+local function IsUnitTheMoonkin(unit)
+    if not UnitExists(unit) then return false end
+    local name, realm = UnitName(unit)
+    if not name then return false end
+    local target = (OneJobOwlDB.moonkinName or ""):lower()
+    if target == "" then return false end
+    if name:lower() == target then return true end -- bare-name match (same realm)
+    if realm and realm ~= "" then
+        return (name .. "-" .. realm):lower() == target -- cross-realm "Name-Realm"
+    end
+    return false
+end
+
+local function MoonkinInGroup()
+    if not NS.HasMoonkinSet() then return false end
+    local n = GetNumGroupMembers()
+    if not n or n == 0 then return false end -- not in a group at all
+    if IsInRaid() then
+        for i = 1, n do
+            if IsUnitTheMoonkin("raid" .. i) then return true end
+        end
+    else
+        if IsUnitTheMoonkin("player") then return true end -- party1-4 exclude you
+        for i = 1, 4 do
+            if IsUnitTheMoonkin("party" .. i) then return true end
+        end
+    end
+    return false
+end
+
+-- Run on GROUP_ROSTER_UPDATE and right after a moonkin is set.
+function NS.CheckMoonkinGroupMembership()
+    if not NS.HasMoonkinSet() then
+        moonkinSeenInGroup = false
+        return
+    end
+    if MoonkinInGroup() then
+        moonkinSeenInGroup = true
+    elseif moonkinSeenInGroup then
+        -- They were grouped with us and now they aren't: they left, or we did.
+        moonkinSeenInGroup = false
+        local who = OneJobOwlDB.moonkinName
+        OneJobOwlDB.moonkinName = ""
+        print("|cffff8800[OneJobOwl]|r " .. who
+            .. " left the group -- shame target cleared.")
+        if NS.RefreshOptions then NS.RefreshOptions() end
+    end
+    -- Never seen in the group => a deliberate out-of-group target; leave it be.
+end
+
 local function GetIFFRemaining(unit)
     for i = 1, 40 do
         local name, _, _, _, _, expirationTime, _, _, _, spellId = UnitDebuff(unit, i)
@@ -261,6 +320,7 @@ frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 frame:RegisterEvent("UNIT_AURA")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+frame:RegisterEvent("GROUP_ROSTER_UPDATE")
 frame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
         OneJobOwlDB = CopyDefaults(NS.defaults, OneJobOwlDB)
@@ -285,6 +345,9 @@ frame:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "PLAYER_REGEN_ENABLED" then
         -- combat over: the FF enemy's shift is done
         if ffEnemy then NS.ClearFFEnemy("combat ended") end
+    elseif event == "GROUP_ROSTER_UPDATE" then
+        -- someone joined/left (or we did): drop the moonkin if they're gone
+        NS.CheckMoonkinGroupMembership()
     end
 end)
 
@@ -311,12 +374,15 @@ end
 function NS.SetMoonkin(name)
     OneJobOwlDB.moonkinName = name
     print("|cffff8800[OneJobOwl]|r Moonkin set to: " .. name .. ". Whispers incoming.")
+    -- if they're already in our group, remember that so a later exit clears them
+    if NS.CheckMoonkinGroupMembership then NS.CheckMoonkinGroupMembership() end
     if NS.RefreshOptions then NS.RefreshOptions() end
 end
 local SetMoonkin = NS.SetMoonkin
 
 function NS.ClearMoonkin()
     OneJobOwlDB.moonkinName = ""
+    moonkinSeenInGroup = false
     print("|cffff8800[OneJobOwl]|r Moonkin cleared. Back to self-shame mode.")
     if NS.RefreshOptions then NS.RefreshOptions() end
 end

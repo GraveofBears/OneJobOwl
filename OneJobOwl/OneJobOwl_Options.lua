@@ -11,7 +11,6 @@ local ADDON_NAME, NS = ...
 function NS.CreateOptions()
     local optionsFrame = CreateFrame("Frame", "OneJobOwlOptions", UIParent)
     optionsFrame.name = "OneJobOwl"
-
     -- ===== Whole-panel scroll =====
     local panelScroll = CreateFrame("ScrollFrame", "OneJobOwlPanelScroll", optionsFrame, "UIPanelScrollFrameTemplate")
     panelScroll:SetPoint("TOPLEFT", 10, -10)
@@ -19,10 +18,8 @@ function NS.CreateOptions()
     local c = CreateFrame("Frame", nil, panelScroll) -- everything anchors to this
     c:SetSize(540, 100) -- height set after layout
     panelScroll:SetScrollChild(c)
-
     local editingIndex = nil
     local y = 5 -- vertical layout cursor
-
     local function Header(text)
         local fs = c:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         fs:SetPoint("TOPLEFT", 5, -y)
@@ -35,10 +32,8 @@ function NS.CreateOptions()
         y = y + 8
         return fs
     end
-
     -- =====================================================================
     Header("General")
-
     local enableCheck = CreateFrame("CheckButton", "OneJobOwlEnable", c, "UICheckButtonTemplate")
     enableCheck:SetPoint("TOPLEFT", 5, -y)
     _G[enableCheck:GetName() .. "Text"]:SetText("Enable OneJobOwl Tracking")
@@ -48,19 +43,15 @@ function NS.CreateOptions()
     end)
     enableCheck:SetChecked(OneJobOwlDB.enabled)
     y = y + 32
-
     local modeLabel = c:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     modeLabel:SetPoint("TOPLEFT", 10, -y - 4)
     modeLabel:SetText("Mode:")
-
     local btnRadio = CreateFrame("CheckButton", "OneJobOwlModeButton", c, "UIRadioButtonTemplate")
     btnRadio:SetPoint("TOPLEFT", 60, -y)
     _G[btnRadio:GetName() .. "Text"]:SetText("Shame Button")
-
     local autoRadio = CreateFrame("CheckButton", "OneJobOwlModeAuto", c, "UIRadioButtonTemplate")
     autoRadio:SetPoint("TOPLEFT", 200, -y)
     _G[autoRadio:GetName() .. "Text"]:SetText("Auto-Shame")
-
     local function SetMode(mode)
         OneJobOwlDB.mode = mode
         btnRadio:SetChecked(mode == "BUTTON")
@@ -71,23 +62,20 @@ function NS.CreateOptions()
     autoRadio:SetScript("OnClick", function() SetMode("AUTO") end)
     SetMode(OneJobOwlDB.mode or "BUTTON")
     y = y + 26
-
     local modeHelp = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     modeHelp:SetPoint("TOPLEFT", 10, -y)
     modeHelp:SetWidth(520)
     modeHelp:SetJustifyH("LEFT")
     modeHelp:SetText("|cffaaaaaaShame Button: the owl appears when IFF expires; the message only sends when you click it. Auto-Shame: no button, the message goes straight to your named moonkin.|r")
     y = y + 36
-
     local scopeLabel = c:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     scopeLabel:SetPoint("TOPLEFT", 10, -y)
     scopeLabel:SetText("Track on")
     y = y + 14
-
     local scopes = {
         { text = "Bosses only (skull)", value = "BOSS" },
-        { text = "Bosses & elites",     value = "ELITE" },
-        { text = "Everything",          value = "ALL" },
+        { text = "Bosses & elites", value = "ELITE" },
+        { text = "Everything", value = "ALL" },
     }
     local function ScopeTextFor(value)
         for _, s in ipairs(scopes) do
@@ -95,7 +83,6 @@ function NS.CreateOptions()
         end
         return scopes[1].text
     end
-
     local scopeDD = CreateFrame("Frame", "OneJobOwlScopeDD", c, "UIDropDownMenuTemplate")
     scopeDD:SetPoint("TOPLEFT", -10, -y)
     UIDropDownMenu_SetWidth(scopeDD, 150)
@@ -113,22 +100,18 @@ function NS.CreateOptions()
     end)
     UIDropDownMenu_SetSelectedValue(scopeDD, OneJobOwlDB.trackScope or "BOSS")
     UIDropDownMenu_SetText(scopeDD, ScopeTextFor(OneJobOwlDB.trackScope or "BOSS"))
-
     local combatCheck = CreateFrame("CheckButton", "OneJobOwlCombatOnly", c, "UICheckButtonTemplate")
     combatCheck:SetPoint("LEFT", scopeDD, "RIGHT", 0, 2)
     _G[combatCheck:GetName() .. "Text"]:SetText("Only while in combat")
     combatCheck:SetScript("OnClick", function(s) OneJobOwlDB.combatOnly = s:GetChecked() end)
     combatCheck:SetChecked(OneJobOwlDB.combatOnly)
     y = y + 40
-
     -- =====================================================================
     Header("Output")
-
     local ddLabel = c:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     ddLabel:SetPoint("TOPLEFT", 10, -y)
     ddLabel:SetText("Channel")
     y = y + 14
-
     local dd = CreateFrame("Frame", "OneJobOwlChannelDD", c, "UIDropDownMenuTemplate")
     dd:SetPoint("TOPLEFT", -10, -y)
     UIDropDownMenu_SetWidth(dd, 110)
@@ -147,12 +130,10 @@ function NS.CreateOptions()
     UIDropDownMenu_SetSelectedValue(dd, OneJobOwlDB.channel or "WHISPER")
     UIDropDownMenu_SetText(dd, OneJobOwlDB.channel or "WHISPER")
     y = y + 38
-
     local nameLabel = c:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     nameLabel:SetPoint("TOPLEFT", 10, -y)
     nameLabel:SetText("Your Moonkin (whisper target)")
     y = y + 16
-
     local nameInput = CreateFrame("EditBox", "OneJobOwlMoonkinName", c, "InputBoxTemplate")
     nameInput:SetSize(160, 25)
     nameInput:SetPoint("TOPLEFT", 15, -y)
@@ -176,7 +157,6 @@ function NS.CreateOptions()
         s:SetText(OneJobOwlDB.moonkinName or "")
         s:ClearFocus()
     end)
-
     local targetBtn = CreateFrame("Button", nil, c, "UIPanelButtonTemplate")
     targetBtn:SetSize(70, 22)
     targetBtn:SetPoint("LEFT", nameInput, "RIGHT", 8, 0)
@@ -185,7 +165,6 @@ function NS.CreateOptions()
         nameInput:ClearFocus() -- commit/revert any half-typed text first
         NS.SetMoonkinFromTarget()
     end)
-
     local clearBtn = CreateFrame("Button", nil, c, "UIPanelButtonTemplate")
     clearBtn:SetSize(70, 22)
     clearBtn:SetPoint("LEFT", targetBtn, "RIGHT", 6, 0)
@@ -195,7 +174,6 @@ function NS.CreateOptions()
         NS.ClearMoonkin()
     end)
     y = y + 28
-
     -- always-true readout of what's actually saved, independent of the editbox
     local moonkinStatus = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     moonkinStatus:SetPoint("TOPLEFT", 15, -y)
@@ -210,18 +188,24 @@ function NS.CreateOptions()
     UpdateMoonkinStatus()
     y = y + 22
 
+    -- Chat instructions now placed directly under Moonkin status
+    local chatNote = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    chatNote:SetPoint("TOPLEFT", 15, -y)
+    chatNote:SetWidth(520)
+    chatNote:SetJustifyH("LEFT")
+    chatNote:SetText("|cffaaaaaaType a name and press Enter to save it, or use the Target / Clear buttons. From chat: /shame Name, /shame target (handles weird-character names), /shameclear. /ojo test sends a test message.|r")
+    y = y + 55  -- generous spacing after the chat note
+
     -- ===== FF Enemy (the watched mob) =====
     local enemyLabel = c:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     enemyLabel:SetPoint("TOPLEFT", 10, -y)
     enemyLabel:SetText("FF Enemy (the mob being watched)")
     y = y + 18
-
     local enemySetBtn = CreateFrame("Button", nil, c, "UIPanelButtonTemplate")
     enemySetBtn:SetSize(110, 22)
     enemySetBtn:SetPoint("TOPLEFT", 15, -y)
     enemySetBtn:SetText("Set from Target")
     enemySetBtn:SetScript("OnClick", function() NS.SetFFEnemyFromTarget() end)
-
     local enemyClearBtn = CreateFrame("Button", nil, c, "UIPanelButtonTemplate")
     enemyClearBtn:SetSize(70, 22)
     enemyClearBtn:SetPoint("LEFT", enemySetBtn, "RIGHT", 6, 0)
@@ -230,7 +214,6 @@ function NS.CreateOptions()
         if NS.GetFFEnemyName() then NS.ClearFFEnemy("manual") end
     end)
     y = y + 26
-
     local enemyStatus = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     enemyStatus:SetPoint("TOPLEFT", 15, -y)
     enemyStatus:SetJustifyH("LEFT")
@@ -239,25 +222,17 @@ function NS.CreateOptions()
         if name then
             enemyStatus:SetText("|cff44ff44Watching: " .. name .. "|r")
         else
-            enemyStatus:SetText("|cffaaaaaaNone set -- tracking follows your current target instead|r")
+            enemyStatus:SetText("|cffffff00None set -- tracking follows your current target instead|r")
         end
     end
     UpdateEnemyStatus()
     y = y + 16
-
     local enemyNote = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     enemyNote:SetPoint("TOPLEFT", 15, -y)
     enemyNote:SetWidth(510)
     enemyNote:SetJustifyH("LEFT")
     enemyNote:SetText("|cffaaaaaaWatched by GUID via your target, focus, or its nameplate, so you can target adds freely. Auto-clears when combat ends or it dies. Chat: /fftarget sets from target, /ffclear clears.|r")
-    y = y + 42
-
-    local chatNote = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    chatNote:SetPoint("TOPLEFT", 10, -y)
-    chatNote:SetWidth(520)
-    chatNote:SetJustifyH("LEFT")
-    chatNote:SetText("|cffaaaaaaType a name and press Enter to save it, or use the Target / Clear buttons. From chat: /shame Name, /shame target (handles weird-character names), /shameclear. /ojo test sends a test message.|r")
-    y = y + 32
+    y = y + 55  -- increased spacing under the note
 
     -- =====================================================================
     Header("Alerts")
