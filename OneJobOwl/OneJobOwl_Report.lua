@@ -192,10 +192,11 @@ local function BuildCard()
     gradeLabel:SetText("FINAL GRADE")
     InkText(gradeLabel)
 
-    local finalGrade = card:CreateFontString(nil, "OVERLAY", "QuestTitleFont")
-    finalGrade:SetPoint("TOP", gradeLabel, "BOTTOM", 0, -6)
-    finalGrade:SetTextHeight(34) -- a bit larger, as befits a verdict
-    card.finalGrade = finalGrade
+	local finalGrade = card:CreateFontString(nil, "OVERLAY")
+	finalGrade:SetFont("Fonts\\FRIZQT__.TTF", 34, "OUTLINE")
+	finalGrade:SetPoint("TOP", gradeLabel, "BOTTOM", 0, -6)
+	finalGrade:SetShadowOffset(0, 0)
+	card.finalGrade = finalGrade
 end
 
 local function GetRow(i)

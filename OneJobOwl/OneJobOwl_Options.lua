@@ -416,6 +416,14 @@ function NS.CreateOptions()
 
     Note("Type a name and press Enter to save it, or use Target / Clear. From chat: /shame Name, /shame target, /shameclear. /ojo test sends a test message.", 15)
 
+    -- New: Silence option for FF Target / Clear
+    local silentFFCheck = Check("OneJobOwlSilentFFTarget", "Silence Chat Alerts for /fftarget and /ffclear", function(s)
+        OneJobOwlDB.silentFFTarget = s:GetChecked()
+    end)
+    silentFFCheck:SetChecked(OneJobOwlDB.silentFFTarget or false)
+
+    Note("Hides confirmation messages when setting or clearing the watched FF enemy. Moonkin set/clear messages remain visible.", 15)
+
     Label("FF Enemy (the mob being watched)")
     local enemySetBtn = CreateFrame("Button", nil, c, "UIPanelButtonTemplate")
     enemySetBtn:SetSize(110, 22)
@@ -634,6 +642,7 @@ function NS.CreateOptions()
         UIDropDownMenu_SetText(outputDD, OutputTextFor(OneJobOwlDB.iamowlOutput or "BUBBLE"))
         enableCheck:SetChecked(OneJobOwlDB.enabled)
         combatCheck:SetChecked(OneJobOwlDB.combatOnly)
+		silentFFCheck:SetChecked(OneJobOwlDB.silentFFTarget or false)
         reportCheck:SetChecked(OneJobOwlDB.iamowlReport ~= false)
         scaleSlider:SetValue(OneJobOwlDB.buttonScale or 1)
         bubbleScaleSlider:SetValue(OneJobOwlDB.bubbleScale or 1)

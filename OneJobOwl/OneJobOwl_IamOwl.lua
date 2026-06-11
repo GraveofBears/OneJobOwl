@@ -284,6 +284,26 @@ function NS.IamOwl_Scan(unit, rem)
         -- Refresh detected
         if lastExpiration and exp > lastExpiration + 0.5 then
             local leftover = lastExpiration - now
+
+            -- SAFETY NET: if the old FF expired clearly BEFORE this cast
+            -- (more than one scan period ago), a drop slipped past live
+            -- detection -- swallowed by a target swap, a reset, or an event
+            -- race. That is a missed drop, not a refresh, and definitely
+            -- not a clutch. Bill the exact gap and say so.
+            if leftover < -0.75 then
+                totalDowntime = totalDowntime + (now - lastExpiration)
+                dropCount = dropCount + 1
+                downStart = nil
+                lastExpiration = exp
+                if UnitAffectingCombat("player") then
+                    local spool = OneJobOwlDB.shames
+                    if spool and #spool > 0 then
+                        OwlSay(spool[math.random(#spool)], true)
+                    end
+                end
+                return
+            end
+
             if leftover < 0 then leftover = 0 end
 
             refreshCount = refreshCount + 1
@@ -353,11 +373,11 @@ end
 
 -- Updated colors to include all new sub-grades
 local GRADE_COLORS = {
-    ["S"]  = "ffffd700", -- Gold
+    ["S"]  = "ffa335ee", -- Purple
     ["A+"] = "ff00ff00", ["A"]  = "ff00ff00", ["A-"] = "ff00ff00", -- Green
     ["B+"] = "ffaaff66", ["B"]  = "ffaaff66", ["B-"] = "ffaaff66", -- Light Green
     ["C+"] = "ffffff00", ["C"]  = "ffffff00", -- Yellow
-    ["D"]  = "ffff8800", -- Orange
+    ["D"]  = "ffff4400", -- Updated to Reddish Orange
     ["F"]  = "ffff4040", -- Red
 }
 

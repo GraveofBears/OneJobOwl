@@ -46,6 +46,7 @@ NS.defaults = {
     enabled = true,
     channel = "WHISPER",     -- default: whisper your designated moonkin
     moonkinName = "",
+	silentFFTarget = false,
     mode = "BUTTON",         -- "BUTTON" = shame button, "AUTO" = auto-send, "IAMOWL" = praise mode
     iamowlReport = true,     -- I Am Owl: post the after-battle report when combat ends
     iamowlOutput = "BUBBLE", -- I Am Owl output: "BUBBLE" = on-screen owl speech bubble, "CHAT" = use channel above
@@ -440,21 +441,17 @@ function NS.SetFFEnemyFromTarget()
 
     local currentGUID = UnitGUID("target")
     
-    -- Only reset the tracking state if we are targeting a DIFFERENT unit
-    -- than the one we are currently watching.
     if not ffEnemy or ffEnemy.guid ~= currentGUID then
         ffEnemy = { guid = currentGUID, name = UnitName("target") }
         NS.ResetTargetState()
         
-        -- Success: Print confirmation that we are now watching this unit
-        print("|cffff8800[OneJobOwl]|r Now watching FF on: |cff00ff00" .. ffEnemy.name .. "|r.")
+        if not OneJobOwlDB.silentFFTarget then
+            print("|cffff8800[OneJobOwl]|r Now watching FF on: |cff00ff00" .. ffEnemy.name .. "|r.")
+        end
     else
-        -- Already watching this target
-        print("|cffff8800[OneJobOwl]|r Already watching: |cff00ff00" .. ffEnemy.name .. "|r.")
+        return true
     end
 
-    -- poll every half second so expiry is caught even if no aura event
-    -- happens to fire on a visible unit token at that moment
     if not enemyTicker then
         enemyTicker = C_Timer.NewTicker(0.5, function()
             local u = ResolveEnemyUnit()
@@ -475,7 +472,11 @@ function NS.ClearFFEnemy(reason)
         enemyTicker = nil
     end
     NS.ResetTargetState()
-    print("|cffff8800[OneJobOwl]|r FF enemy cleared (" .. (reason or "manual") .. "): " .. name)
+    
+    if not OneJobOwlDB.silentFFTarget then
+        print("|cffff8800[OneJobOwl]|r FF enemy cleared (" .. (reason or "manual") .. "): " .. name)
+    end
+    
     if NS.RefreshOptions then NS.RefreshOptions() end
 end
 
