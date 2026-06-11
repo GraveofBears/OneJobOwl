@@ -28,8 +28,11 @@ function NS.PlayShameSound()
     end
 end
 
+local AUTOHIDE_SECONDS = 10  -- shame button retracts on its own after this long
+
 local button
 local moverMode = false
+local autoHideTimer
 
 function NS.CreateShameButton()
     if button then return end
@@ -123,10 +126,20 @@ function NS.ShowShameButton()
     button:Show()
     button.pulse:Play()
     NS.PlayShameSound()
+    -- the owl gets AUTOHIDE_SECONDS of judgment, then retracts on its own
+    if autoHideTimer then autoHideTimer:Cancel() end
+    autoHideTimer = C_Timer.NewTimer(AUTOHIDE_SECONDS, function()
+        autoHideTimer = nil
+        NS.HideShameButton()
+    end)
 end
 
 function NS.HideShameButton()
     if not button or moverMode or not button:IsShown() then return end
+    if autoHideTimer then
+        autoHideTimer:Cancel()
+        autoHideTimer = nil
+    end
     button.pulse:Stop()
     button:Hide()
 end

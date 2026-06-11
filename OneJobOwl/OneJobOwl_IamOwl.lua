@@ -132,8 +132,13 @@ NS.praiseMessages = {
 
 -- Faerie Fire lasts 40s; a "tight" refresh lands in the last few seconds.
 local FF_DURATION   = 40
-local TIGHT_WINDOW  = 8     -- refreshing with <= this many seconds left is efficient
 local PRAISE_COOLDOWN = 12  -- min seconds between live clutch-praise lines (anti-spam)
+
+-- Clutch window: refreshing with <= this many seconds left counts as a
+-- clutch refresh. Configurable via the options slider (1-10s, default 8).
+local function TightWindow()
+    return OneJobOwlDB.tightWindow or 8
+end
 
 -- ===== per-combat state =====
 local tracking       = false
@@ -169,9 +174,18 @@ function NS.ResetIamOwlTracking()
     ClearState()
 end
 
--- Route a line to chat. WHISPER (the default) talks to you privately, since
--- in praise mode "the moonkin" is you. Other channels broadcast.
+-- Route a line to its destination. Default ("BUBBLE") shows it in the
+-- on-screen owl speech bubble -- zero chat spam. Set the I Am Owl output to
+-- "CHAT" in options to broadcast on the configured channel instead (or print
+-- privately when the channel is WHISPER, since whispering yourself is silly).
 local function OwlSay(text, isShame)
+    if (OneJobOwlDB.iamowlOutput or "BUBBLE") == "BUBBLE" then
+        if NS.OwlBubbleSay then
+            NS.OwlBubbleSay(text, isShame)
+            return
+        end
+        -- bubble file missing somehow: fall through to chat so nothing is lost
+    end
     local ch = OneJobOwlDB.channel or "WHISPER"
     local tagged = "[I Am Owl] " .. text
     if ch == "RAID" and IsInRaid() then
@@ -227,11 +241,14 @@ function NS.IamOwl_Scan(unit, rem)
                 leftoverSum = leftoverSum + leftover
 
 				-- Clutch refresh praise - only while actively in combat
+				local pool = OneJobOwlDB.praises
+				if (not pool or #pool == 0) then pool = NS.praiseMessages end
 				if UnitAffectingCombat("player")
-				   and leftover <= TIGHT_WINDOW
-				   and (now - lastPraise) >= PRAISE_COOLDOWN then
+				   and leftover <= TightWindow()
+				   and (now - lastPraise) >= PRAISE_COOLDOWN
+				   and pool and #pool > 0 then
 					lastPraise = now
-					OwlSay(NS.praiseMessages[math.random(#NS.praiseMessages)], false)
+					OwlSay(pool[math.random(#pool)], false)
 				end
             end
             lastExpiration = exp
@@ -302,7 +319,8 @@ function NS.IamOwl_EndCombat()
     local avgLeftover = nil
     if refreshCount > 0 then
         avgLeftover = leftoverSum / refreshCount
-        local tight = (TIGHT_WINDOW - avgLeftover) / TIGHT_WINDOW
+        local tw = TightWindow()
+        local tight = (tw - avgLeftover) / tw
         if tight < 0 then tight = 0 elseif tight > 1 then tight = 1 end
         score = uptimePct * 0.85 + tight * 15
     end

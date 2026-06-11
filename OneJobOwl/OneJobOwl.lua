@@ -6,10 +6,9 @@
 --   target, plus PLAYER_TARGET_CHANGED. Each time, we scan the target's
 --   debuffs for Faerie Fire (any rank, druid or feral version).
 --   We remember whether FF has been SEEN on the current target (iffSeen).
---   The shame only triggers when FF was applied and then expired/fell off,
---   or when its remaining time drops below your threshold. A fresh pull
---   where FF hasn't gone up yet will NOT trigger (set threshold to 0 if
---   you only want actual fall-offs, not "about to expire" warnings).
+--   The shame only triggers when FF was applied and then expired/fell off.
+--   A fresh pull where FF hasn't gone up yet will NOT trigger. If FF is
+--   reapplied, the shame button retracts (it also auto-hides on its own).
 
 local ADDON_NAME, NS = ...
 
@@ -26,18 +25,24 @@ OneJobOwlDB = OneJobOwlDB or {}
 
 NS.defaults = {
     enabled = true,
-    threshold = 5,
     channel = "WHISPER",     -- default: whisper your designated moonkin
     moonkinName = "",
     mode = "BUTTON",         -- "BUTTON" = shame button, "AUTO" = auto-send, "IAMOWL" = praise mode
     iamowlReport = true,     -- I Am Owl: post the after-battle report when combat ends
+    iamowlOutput = "BUBBLE", -- I Am Owl output: "BUBBLE" = on-screen owl speech bubble, "CHAT" = use channel above
+    bubblePos = nil,         -- saved drag position of the owl bubble
+    bubbleScale = 1.0,       -- owl bubble scale (0.5 - 2.0)
+	balloonScale = 1.0,      -- speech bubble + text
+    bubbleDuration = 6,      -- seconds a bubble message stays before fading
     sound = 8959,            -- soundkit ID played when the button appears (8959 = Raid Warning)
     trackScope = "BOSS",     -- "BOSS" (skull only), "ELITE" (bosses+elites), "ALL"
     combatOnly = true,       -- only alert while you are in combat
     buttonPos = nil,         -- saved drag position of the shame button
     buttonScale = 1.0,       -- shame button scale (0.5 - 2.0)
     glowColor = { r = 1, g = 0.2, b = 0.1, a = 0.7 }, -- shame button glow
+    tightWindow = 8,         -- I Am Owl: refreshing FF with <= this many seconds left counts as "clutch"
     shames = nil,            -- seeded from NS.defaultShames on first load
+    praises = nil,           -- seeded from NS.praiseMessages on first load
 }
 
 local lastWarning = 0
@@ -91,6 +96,15 @@ function NS.SeedShames(force)
             end
         end
         OneJobOwlDB.customShames = nil
+    end
+end
+
+function NS.SeedPraises(force)
+    if force or type(OneJobOwlDB.praises) ~= "table" or #OneJobOwlDB.praises == 0 then
+        OneJobOwlDB.praises = {}
+        for _, v in ipairs(NS.praiseMessages or {}) do
+            table.insert(OneJobOwlDB.praises, v)
+        end
     end
 end
 
@@ -282,12 +296,8 @@ local function CheckIFF(unit)
             iffSeen = false
             Trigger()
         end
-    elseif rem <= (OneJobOwlDB.threshold or 5) then
-        -- Applied but about to expire
-        iffSeen = true
-        Trigger()
     else
-        -- Healthy uptime: the owl is redeemed, retract the button
+        -- FF is up: the owl is redeemed, retract the button
         iffSeen = true
         if NS.HideShameButton then NS.HideShameButton() end
     end
@@ -340,7 +350,9 @@ frame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
         OneJobOwlDB = CopyDefaults(NS.defaults, OneJobOwlDB)
         NS.SeedShames(false)
+        NS.SeedPraises(false)
         NS.CreateShameButton()
+        if NS.CreateOwlBubble then NS.CreateOwlBubble() end
         NS.CreateOptions()
     elseif event == "PLAYER_TARGET_CHANGED" then
         if ffEnemy then
@@ -433,6 +445,8 @@ SlashCmdList["ONEJOBOWL"] = function(msg)
         NS.SendShame()
     elseif cmd == "button" then
         if NS.ShowShameButton then NS.ShowShameButton() end -- preview the button
+    elseif cmd == "owl" then
+        if NS.PreviewOwlBubble then NS.PreviewOwlBubble() end -- preview the owl bubble
     else
         OpenOptions()
     end
