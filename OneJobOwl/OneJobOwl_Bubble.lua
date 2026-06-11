@@ -1,8 +1,16 @@
 -- OneJobOwl_Bubble.lua
 local ADDON_NAME, NS = ...
 
-local OWL_TEXTURE = "Interface\\AddOns\\OneJobOwl\\IamOwl.tga"
+-- Two faces, one owl: mad for shames, happy for praise. The mood is driven
+-- by the same isShame flag every message already carries.
+local OWL_TEXTURE_MAD   = "Interface\\AddOns\\OneJobOwl\\IamOwl.tga"
+local OWL_TEXTURE_HAPPY = "Interface\\AddOns\\OneJobOwl\\IamOwlWoW.tga"
 local OWL_SIZE     = 128
+
+local function OwlFaceFor(isShame)
+    if isShame == true then return OWL_TEXTURE_MAD end
+    return OWL_TEXTURE_HAPPY -- praise and neutral announcements both smile
+end
 local HALO_SCALE   = 1.20
 local RING_SCALE   = 1.0
 local BUBBLE_WIDTH = 280
@@ -31,7 +39,7 @@ function NS.CreateOwlBubble()
 
     local tex = owl:CreateTexture(nil, "ARTWORK")
     tex:SetAllPoints()
-    tex:SetTexture(OWL_TEXTURE)
+    tex:SetTexture(OWL_TEXTURE_MAD)
     if tex.SetSnapToPixelGrid then
         tex:SetSnapToPixelGrid(false)
         tex:SetTexelSnappingBias(0)
@@ -156,6 +164,7 @@ function NS.OwlBubbleSay(msg, isShame)
         balloon.text:SetTextColor(1, 1, 1)
         owl.halo:SetVertexColor(1, 0.82, 0.2, 0.55)
     end
+    owl.tex:SetTexture(OwlFaceFor(isShame))
 
     balloon.text:SetText(msg)
     LayoutBalloon()
@@ -181,6 +190,7 @@ function NS.SetBubbleMover(enabled)
     owl.bob:Stop()
     if enabled then
         owl:SetAlpha(0.8)
+        owl.tex:SetTexture(OWL_TEXTURE_HAPPY)
         balloon.text:SetTextColor(0.3, 1, 0.3)
         balloon.text:SetText("DRAG ME -- this is where the owl will speak.")
         LayoutBalloon()

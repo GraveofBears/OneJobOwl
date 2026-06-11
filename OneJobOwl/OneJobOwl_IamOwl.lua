@@ -165,12 +165,28 @@ function NS.IsIamOwlMode()
     return OneJobOwlDB.mode == "IAMOWL"
 end
 
--- Called from core's ResetTargetState. We guard on combat so that swapping
--- targets mid-pull (onto an add, say) never throws away the fight's numbers;
--- only a clean out-of-combat reset wipes the slate.
+-- One-line state dump for /ojo debug.
+function NS.IamOwlDebugLine()
+    return string.format(
+        "IamOwl: tracking=%s ffUp=%s firstApplied=%s refreshes=%d drops=%d downtime=%.1fs report=%s output=%s",
+        tostring(tracking), tostring(ffUp),
+        firstApplied and "yes" or "no",
+        refreshCount, dropCount, totalDowntime,
+        tostring(OneJobOwlDB.iamowlReport ~= false),
+        tostring(OneJobOwlDB.iamowlOutput or "BUBBLE"))
+end
+
+-- Called from core's ResetTargetState. Two guards: never wipe mid-combat
+-- (target swaps onto adds must not throw away the fight's numbers), and
+-- never wipe an OPEN scorecard -- on a killing blow the player's combat
+-- flag drops a beat before PLAYER_REGEN_ENABLED dispatches, and a death
+-- scan landing in that window used to slip past the combat guard and
+-- erase the fight right before the report. Closing a live scorecard is
+-- IamOwl_EndCombat's job alone; this only sweeps up stale, already-
+-- reported state between pulls.
 function NS.ResetIamOwlTracking()
     if UnitAffectingCombat("player") then return end
-    tracking = false
+    if tracking then return end -- open scorecard: EndCombat will close it
     ClearState()
 end
 
@@ -199,6 +215,11 @@ local function OwlSay(text, isShame)
     end
     local ch = OneJobOwlDB.channel or "WHISPER"
     local tagged = "[I Am Owl] " .. text
+    if ch == "RAID" or ch == "PARTY" or ch == "YELL" or ch == "SAY" then
+        -- Color escape codes don't render in outbound chat (and can get the
+        -- message eaten), so strip them before broadcasting.
+        tagged = tagged:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    end
     if ch == "RAID" and IsInRaid() then
         SendChatMessage(tagged, "RAID")
     elseif ch == "PARTY" and IsInGroup() then
@@ -221,65 +242,84 @@ function NS.IamOwl_StartCombat()
     combatStart = GetTime()
 end
 
--- Fed by core on every aura scan: the unit and current FF remaining in
--- seconds (nil means FF is not on the unit).
+-- Fed by core on every aura scan where FF IS on the unit (rem = seconds
+-- remaining). Drops are no longer detected here: core verifies a drop is
+-- real (not a death race or a boss phase) and then calls IamOwl_Drop or
+-- IamOwl_Excuse instead.
 function NS.IamOwl_Scan(unit, rem)
     if not NS.IsIamOwlMode() or not tracking then return end
+    if rem == nil then return end
     local now = GetTime()
 
     -- Block all live praise once combat is ending
     if not UnitAffectingCombat("player") then return end
 
-    if rem ~= nil then
-        -- FF is on the boss right now.
-        local exp = now + rem
+    -- FF is on the boss right now.
+    local exp = now + rem
 
-        if not ffUp then
-            if downStart then
-                totalDowntime = totalDowntime + (now - downStart)
-                downStart = nil
-            end
-            if not firstApplied then firstApplied = now end
-            ffUp = true
-            lastExpiration = exp
-        else
-            -- Refresh detected
-            if lastExpiration and exp > lastExpiration + 0.5 then
-                local leftover = lastExpiration - now
-                if leftover < 0 then leftover = 0 end
-
-                refreshCount = refreshCount + 1
-                leftoverSum = leftoverSum + leftover
-
-				-- Clutch refresh praise - only while actively in combat
-				local pool = OneJobOwlDB.praises
-				if (not pool or #pool == 0) then pool = NS.praiseMessages end
-				if UnitAffectingCombat("player")
-				   and leftover <= TightWindow()
-				   and (now - lastPraise) >= PRAISE_COOLDOWN
-				   and pool and #pool > 0 then
-					lastPraise = now
-					OwlSay(pool[math.random(#pool)], false)
-				end
-            end
-            lastExpiration = exp
+    if not ffUp then
+        if downStart then
+            totalDowntime = totalDowntime + (now - downStart)
+            downStart = nil
         end
+        if not firstApplied then firstApplied = now end
+        ffUp = true
+        lastExpiration = exp
     else
-        -- FF dropped off
-        if ffUp then
-            ffUp = false
-            downStart = now
-            dropCount = dropCount + 1
+        -- Refresh detected
+        if lastExpiration and exp > lastExpiration + 0.5 then
+            local leftover = lastExpiration - now
+            if leftover < 0 then leftover = 0 end
 
-            -- Only shame while still in combat
-            if UnitAffectingCombat("player") then
-                local pool = OneJobOwlDB.shames
-                if pool and #pool > 0 then
-                    OwlSay(pool[math.random(#pool)], true)
-                end
+            refreshCount = refreshCount + 1
+            leftoverSum = leftoverSum + leftover
+
+            -- Clutch refresh praise - only while actively in combat
+            local pool = OneJobOwlDB.praises
+            if (not pool or #pool == 0) then pool = NS.praiseMessages end
+            if UnitAffectingCombat("player")
+               and leftover <= TightWindow()
+               and (now - lastPraise) >= PRAISE_COOLDOWN
+               and pool and #pool > 0 then
+                lastPraise = now
+                OwlSay(pool[math.random(#pool)], false)
             end
+        end
+        lastExpiration = exp
+    end
+end
+
+-- A verified, honest drop: FF hit zero on a living, attackable boss.
+-- Called by core after the death-race check passes. dropAt is when the
+-- drop was first detected, so downtime isn't shortened by the verify delay.
+function NS.IamOwl_Drop(dropAt)
+    if not NS.IsIamOwlMode() or not tracking then return end
+    if not ffUp then return end
+    ffUp = false
+    lastExpiration = nil
+    downStart = dropAt or GetTime()
+    dropCount = dropCount + 1
+
+    -- Only shame while still in combat
+    if UnitAffectingCombat("player") then
+        local pool = OneJobOwlDB.shames
+        if pool and #pool > 0 then
+            OwlSay(pool[math.random(#pool)], true)
         end
     end
+end
+
+-- FF disappeared through no fault of the owl: the mob died with FF on it,
+-- or a boss phase made it untrackable while FF ran out. No drop counted,
+-- no shame, and no downtime clock -- the books simply reset to "FF not up
+-- yet", so the next application resumes scoring cleanly.
+function NS.IamOwl_Excuse()
+    if not tracking then return end
+    if ffUp then
+        ffUp = false
+        lastExpiration = nil
+    end
+    downStart = nil
 end
 
 local function GradeFor(score)
@@ -293,10 +333,33 @@ local function GradeFor(score)
     else return "F" end
 end
 
--- Combat end: tally everything and post the report.
+-- Grade tier colors for the report. S tiers go gold because they're beyond
+-- mortal letter grades; A green, B light green, C yellow, D orange, F red.
+local GRADE_COLORS = {
+    ["S+"] = "ffffd700", -- gold
+    ["S"]  = "ffffd700", -- gold
+    ["A+"] = "ff00ff00", -- green
+    ["A"]  = "ff00ff00", -- green
+    ["B"]  = "ffaaff66", -- light green
+    ["C"]  = "ffffff00", -- yellow
+    ["D"]  = "ffff8800", -- orange
+    ["F"]  = "ffff4040", -- red
+}
+
+local function ColorGrade(text, grade)
+    return "|c" .. (GRADE_COLORS[grade] or "ffffffff") .. text .. "|r"
+end
+
+-- Combat end: tally everything and post the report. This is the ONLY place
+-- an open scorecard gets closed, so it must always close it -- even if the
+-- mode was switched away from I Am Owl mid-fight.
 function NS.IamOwl_EndCombat()
-    if not NS.IsIamOwlMode() or not tracking then return end
+    if not tracking then return end
     tracking = false
+    if not NS.IsIamOwlMode() then
+        ClearState() -- mode changed mid-fight; discard quietly
+        return
+    end
 
     local now = GetTime()
 
@@ -340,19 +403,24 @@ function NS.IamOwl_EndCombat()
 
     local grade = GradeFor(score)
     local rounded = math.floor(score + 0.5)
+    local gradeText = ColorGrade(("Grade %s (%d)"):format(grade, rounded), grade)
 
     local report
     if avgLeftover then
         report = string.format(
-            "Grade %s (%d) | %d%% uptime | %d refresh%s | %.1fs total downtime | avg %.1fs left at refresh",
-            grade, rounded, uptimePct, refreshCount,
+            "%s | %d%% uptime | %d refresh%s | %.1fs total downtime | avg %.1fs left at refresh",
+            gradeText, uptimePct, refreshCount,
             refreshCount == 1 and "" or "es", totalDowntime, avgLeftover)
     else
         report = string.format(
-            "Grade %s (%d) | %d%% uptime | %d refreshes | %.1fs total downtime",
-            grade, rounded, uptimePct, refreshCount, totalDowntime)
+            "%s | %d%% uptime | %d refreshes | %.1fs total downtime",
+            gradeText, uptimePct, refreshCount, totalDowntime)
     end
 
-    OwlSay(report, score < 80)
+    -- Report mood follows the GRADE, not a raw score line: B and above gets
+    -- the happy owl and green text, C/D/F gets the mad owl and red. (The old
+    -- score<80 cutoff sat inside the B band, so a 77 B showed up angry.)
+    local badGrade = (grade == "C" or grade == "D" or grade == "F")
+    OwlSay(report, badGrade)
     ClearState()
 end

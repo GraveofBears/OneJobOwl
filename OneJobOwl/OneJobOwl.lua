@@ -9,6 +9,23 @@
 --   The shame only triggers when FF was applied and then expired/fell off.
 --   A fresh pull where FF hasn't gone up yet will NOT trigger. If FF is
 --   reapplied, the shame button retracts (it also auto-hides on its own).
+--
+-- PHASE FORGIVENESS:
+--   Bosses vanish, fly off, or go immune (Solarian's void phase, Al'ar's
+--   rebirth, Kael's early phases). While the boss can't be tracked (doesn't
+--   exist / can't be attacked / not visible), scanning halts. If FF expired
+--   during such a gap, that is the BOSS's fault, not the owl's: we detect
+--   the gap in scan times and forgive the drop, re-arming fresh -- the next
+--   FF application starts a clean watch, with a few seconds of grace to
+--   get it back up.
+--
+-- DEATH RACE:
+--   When a mob dies, the aura-wipe UNIT_AURA event often arrives BEFORE
+--   UnitIsDeadOrGhost() reports true, which looked like "FF fell off a
+--   living mob". So no drop is ever acted on instantly: we wait a beat
+--   (DROP_VERIFY_DELAY) and re-verify the unit is still alive, attackable,
+--   visible, and still missing FF. Dead, despawned, or phased mobs are
+--   excused; reapplied FF cancels the pending shame.
 
 local ADDON_NAME, NS = ...
 
@@ -47,6 +64,12 @@ NS.defaults = {
 
 local lastWarning = 0
 local iffSeen = false  -- has FF been observed on the current watched unit?
+
+-- Smarter detection: phase forgiveness + death-race verification.
+local PHASE_GAP         = 2.0  -- a scan gap longer than this means the unit was untrackable (boss phase)
+local DROP_VERIFY_DELAY = 0.3  -- seconds to wait before confirming a drop is real (not a death race)
+local lastGoodScan = nil       -- GetTime() of the last successful aura scan on the watched unit
+local pendingDrop  = nil       -- token for an in-flight drop verification (nil = none)
 
 -- The designated FF Enemy: a specific mob watched by GUID, independent of
 -- what you're currently targeting. Runtime-only on purpose -- it clears
@@ -228,8 +251,10 @@ end
 
 function NS.ResetTargetState()
     iffSeen = false
+    lastGoodScan = nil
+    pendingDrop = nil
     if NS.HideShameButton then NS.HideShameButton() end
-    if NS.ResetIamOwlTracking then NS.ResetIamOwlTracking() end   -- <-- Add this
+    if NS.ResetIamOwlTracking then NS.ResetIamOwlTracking() end
 end
 
 -- Does the current target matter enough to shame over?
@@ -257,11 +282,16 @@ local function CheckIFF(unit)
     -- With a designated moonkin anyone can run the watch (raid lead mode);
     -- without one, original self-shame behavior: only while YOU are moonkin.
     if not NS.HasMoonkinSet() and not IsMoonkin() then return end
-    if not UnitExists(unit) or not UnitCanAttack("player", unit) then
+    if not UnitExists(unit) or not UnitCanAttack("player", unit)
+        or not UnitIsVisible(unit) then
+        -- Untrackable: vanished, flew off, went friendly/immune (boss phase).
+        -- Don't touch the books; the scan gap that builds up here is what
+        -- earns the owl its phase forgiveness.
         if not ffEnemy then NS.ResetTargetState() end
         return
     end
-    if UnitIsDeadOrGhost(unit) then
+    if UnitIsDeadOrGhost(unit) or (UnitHealth(unit) or 0) <= 0 then
+        pendingDrop = nil -- it died; whatever FF did at the end is excused
         if ffEnemy then
             NS.ClearFFEnemy("it died") -- boss is dead, job's done
         else
@@ -279,31 +309,114 @@ local function CheckIFF(unit)
         return -- keep state, just stay quiet out of combat
     end
 
-    local rem = GetIFFRemaining(unit)
+    local now = GetTime()
+    local gap = lastGoodScan and (now - lastGoodScan) or 0
+    lastGoodScan = now
 
-    -- I Am Owl praise mode keeps its own books and handles its own feedback;
-    -- the button / auto-shame paths stay out of its way.
-    if NS.IsIamOwlMode and NS.IsIamOwlMode() then
-        if NS.IamOwl_Scan then NS.IamOwl_Scan(unit, rem) end
-        iffSeen = (rem ~= nil)
+    local rem = GetIFFRemaining(unit)
+    local iamowl = NS.IsIamOwlMode and NS.IsIamOwlMode()
+
+    if rem ~= nil then
+        -- FF is up: the owl is redeemed. Cancel any pending shame.
+        pendingDrop = nil
+        if iamowl and NS.IamOwl_Scan then NS.IamOwl_Scan(unit, rem) end
+        iffSeen = true
         if NS.HideShameButton then NS.HideShameButton() end
         return
     end
 
-    if rem == nil then
-        -- IFF not on target. Only shame if we actually saw it up before.
-        if iffSeen then
-            iffSeen = false
+    -- FF not on the unit. Only act if we actually saw it up before.
+    if not iffSeen then return end
+    iffSeen = false
+
+    if gap > PHASE_GAP then
+        -- We couldn't track the unit while FF ran out (vanish phase, flight
+        -- phase, immunity). Not the owl's fault: forgive and re-arm fresh.
+        if iamowl and NS.IamOwl_Excuse then NS.IamOwl_Excuse() end
+        return
+    end
+
+    -- Looks like a genuine drop -- but mobs often wipe their auras an instant
+    -- BEFORE the game reports them dead. Verify after a short delay.
+    local guid = UnitGUID(unit)
+    local dropAt = now
+    local token = {}
+    pendingDrop = token
+    C_Timer.After(DROP_VERIFY_DELAY, function()
+        if pendingDrop ~= token then return end -- superseded or cancelled
+        pendingDrop = nil
+        -- Re-resolve the unit; tokens can shift in 0.3s.
+        local u
+        if ffEnemy then
+            u = ResolveEnemyUnit()
+        elseif UnitExists("target") and UnitGUID("target") == guid then
+            u = "target"
+        end
+        if not u or UnitGUID(u) ~= guid
+            or UnitIsDeadOrGhost(u) or (UnitHealth(u) or 0) <= 0
+            or not UnitCanAttack("player", u) or not UnitIsVisible(u) then
+            -- Dead, despawned, or phased out between detection and now:
+            -- FF "fell off" because the mob stopped existing. Excused.
+            if iamowl and NS.IamOwl_Excuse then NS.IamOwl_Excuse() end
+            return
+        end
+        if GetIFFRemaining(u) ~= nil then
+            iffSeen = true -- reapplied within the window; no harm done
+            return
+        end
+        -- Confirmed: living, attackable mob with no Faerie Fire. Shame.
+        if iamowl then
+            if NS.IamOwl_Drop then NS.IamOwl_Drop(dropAt) end
+        else
             Trigger()
         end
-    else
-        -- FF is up: the owl is redeemed, retract the button
-        iffSeen = true
-        if NS.HideShameButton then NS.HideShameButton() end
-    end
+    end)
 end
 
 -- ===== FF Enemy set/clear =====
+-- /ojo debug -- walk the whole detection chain on the current target and
+-- print PASS/FAIL for every guard, plus live state from both modules.
+-- When the owl goes quiet, this says exactly which gate is closed.
+function NS.DebugStatus()
+    local function P(label, ok, extra)
+        local mark = ok and "|cff44ff44PASS|r" or "|cffff4444FAIL|r"
+        print("  " .. mark .. "  " .. label .. (extra and (" -- " .. extra) or ""))
+    end
+    print("|cffff8800[OneJobOwl]|r debug status:")
+    print("  mode=" .. tostring(OneJobOwlDB.mode)
+        .. "  enabled=" .. tostring(OneJobOwlDB.enabled)
+        .. "  combatOnly=" .. tostring(OneJobOwlDB.combatOnly)
+        .. "  scope=" .. tostring(OneJobOwlDB.trackScope))
+    print("  IamOwl module loaded: " .. tostring(NS.IsIamOwlMode ~= nil)
+        .. "  |  IsIamOwlMode(): " .. tostring(NS.IsIamOwlMode and NS.IsIamOwlMode()))
+    print("  Bubble module loaded: " .. tostring(NS.OwlBubbleSay ~= nil))
+    print("  iffSeen=" .. tostring(iffSeen)
+        .. "  lastGoodScan=" .. (lastGoodScan and string.format("%.1fs ago", GetTime() - lastGoodScan) or "never")
+        .. "  pendingDrop=" .. tostring(pendingDrop ~= nil))
+    print("  heartbeat ticker: " .. tostring(NS.IsWatchTickerRunning and NS.IsWatchTickerRunning() or false)
+        .. "  ffEnemy=" .. tostring(ffEnemy and ffEnemy.name or "none"))
+    if NS.IamOwlDebugLine then print("  " .. NS.IamOwlDebugLine()) end
+
+    print("  guard chain for current target:")
+    P("enabled", OneJobOwlDB.enabled)
+    P("moonkin-or-designated", NS.HasMoonkinSet() or IsMoonkin(),
+        "form=" .. tostring(GetShapeshiftForm()) .. " moonkinName='" .. tostring(OneJobOwlDB.moonkinName) .. "'")
+    local unit = "target"
+    P("UnitExists", UnitExists(unit))
+    if UnitExists(unit) then
+        P("UnitCanAttack", UnitCanAttack("player", unit))
+        P("UnitIsVisible", UnitIsVisible(unit))
+        P("alive", not UnitIsDeadOrGhost(unit) and (UnitHealth(unit) or 0) > 0,
+            "health=" .. tostring(UnitHealth(unit)))
+        P("TargetInScope", ffEnemy ~= nil or TargetInScope(),
+            "level=" .. tostring(UnitLevel(unit)) .. " class=" .. tostring(UnitClassification(unit)))
+        P("combat gate", (not OneJobOwlDB.combatOnly) or UnitAffectingCombat("player"),
+            "inCombat=" .. tostring(UnitAffectingCombat("player")))
+        local rem = GetIFFRemaining(unit)
+        print("  FF on target: " .. (rem and string.format("%.1fs remaining", rem) or "|cffff4444none|r"))
+    end
+end
+
 function NS.SetFFEnemyFromTarget()
     if not UnitExists("target") or not UnitCanAttack("player", "target")
         or UnitIsDeadOrGhost("target") then
@@ -346,6 +459,26 @@ frame:RegisterEvent("UNIT_AURA")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 frame:RegisterEvent("GROUP_ROSTER_UPDATE")
+
+-- Combat heartbeat: poll the watched unit every half second while in combat.
+-- This is what makes the phase-gap detection trustworthy -- while the boss is
+-- trackable, scans land at least this often, so any longer silence really
+-- does mean the boss was untrackable. (The /fftarget path has its own ticker.)
+local watchTicker
+local function StartWatchTicker()
+    if watchTicker then return end
+    watchTicker = C_Timer.NewTicker(0.5, function()
+        if not ffEnemy then CheckIFF("target") end
+    end)
+end
+local function StopWatchTicker()
+    if watchTicker then
+        watchTicker:Cancel()
+        watchTicker = nil
+    end
+end
+function NS.IsWatchTickerRunning() return watchTicker ~= nil end
+
 frame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
         OneJobOwlDB = CopyDefaults(NS.defaults, OneJobOwlDB)
@@ -354,6 +487,12 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         NS.CreateShameButton()
         if NS.CreateOwlBubble then NS.CreateOwlBubble() end
         NS.CreateOptions()
+        -- /reload mid-fight: PLAYER_REGEN_DISABLED already fired before we
+        -- existed, so start the scorecard and heartbeat ourselves.
+        if UnitAffectingCombat("player") then
+            if NS.IamOwl_StartCombat then NS.IamOwl_StartCombat() end
+            StartWatchTicker()
+        end
     elseif event == "PLAYER_TARGET_CHANGED" then
         if ffEnemy then
             -- enemy identity is fixed; target swaps don't reset tracking
@@ -372,7 +511,10 @@ frame:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "PLAYER_REGEN_DISABLED" then
         -- combat started: I Am Owl begins a fresh scorecard
         if NS.IamOwl_StartCombat then NS.IamOwl_StartCombat() end
+        StartWatchTicker()
     elseif event == "PLAYER_REGEN_ENABLED" then
+        StopWatchTicker()
+        pendingDrop = nil -- combat's over; any unconfirmed drop is moot
         -- combat over: the FF enemy's shift is done
         if ffEnemy then NS.ClearFFEnemy("combat ended") end
         -- and I Am Owl posts the after-action report
@@ -443,6 +585,8 @@ SlashCmdList["ONEJOBOWL"] = function(msg)
     local cmd = msg:match("^(%S*)"):lower()
     if cmd == "test" then
         NS.SendShame()
+    elseif cmd == "debug" then
+        NS.DebugStatus()
     elseif cmd == "button" then
         if NS.ShowShameButton then NS.ShowShameButton() end -- preview the button
     elseif cmd == "owl" then
