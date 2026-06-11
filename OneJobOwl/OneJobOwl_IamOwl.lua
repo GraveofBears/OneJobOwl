@@ -174,11 +174,22 @@ function NS.ResetIamOwlTracking()
     ClearState()
 end
 
+-- Play the selected sound if one is configured
+function NS.PlayIamOwlSound()
+    local id = OneJobOwlDB.iamowlSound or 0
+    if id and id > 0 then
+        PlaySound(id, "Master")
+    end
+end
+
 -- Route a line to its destination. Default ("BUBBLE") shows it in the
 -- on-screen owl speech bubble -- zero chat spam. Set the I Am Owl output to
 -- "CHAT" in options to broadcast on the configured channel instead (or print
 -- privately when the channel is WHISPER, since whispering yourself is silly).
 local function OwlSay(text, isShame)
+    -- Trigger the selected sound whenever the Owl speaks or reports
+    NS.PlayIamOwlSound()
+
     if (OneJobOwlDB.iamowlOutput or "BUBBLE") == "BUBBLE" then
         if NS.OwlBubbleSay then
             NS.OwlBubbleSay(text, isShame)

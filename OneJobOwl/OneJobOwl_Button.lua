@@ -9,23 +9,52 @@ local ADDON_NAME, NS = ...
 
 local TEXTURE_PATH = "Interface\\AddOns\\OneJobOwl\\Moonkin.tga"
 
--- Sound choices shown in options. PlaySound() soundkit IDs from the game.
+-- REMOVED "local" so other files can see this list
 NS.sounds = {
     { name = "None",                 id = 0 },
+		{ name = "Default Alert",    id = 8959 },
     { name = "Moonkin Crit",         id = 5358 },
     { name = "Dead Moonkin",         id = 5359 },
-    { name = "Moonkin Mad", 		 id = 5360 },
-    { name = "I miss my dog",   	 id = 11798 },
+    { name = "Moonkin Mad",          id = 5360 },
+    { name = "I miss my dog",        id = 11798 },
     { name = "Where is that dog",    id = 11796 },
-    { name = "Druid Of The Claw",    id = 6209 },
-    { name = "Whisper Alert",        id = 3081 },
+    { name = "I'm Awake Druid",      id = 6209 },
+	{ name = "Hibernating Druid",    id = 6208 },
+	{ name = "Bell",                 id = 3175 },
+	{ name = "Auction",              id = 5274 },
+	{ name = "Succubus",             id = 7096 },
+	{ name = "Ready Check",          id = 8960 },
+	{ name = "Quest Failed",         id = 847 },
+	{ name = "Murloc",               id = 416 },
+	{ name = "Chicken",              id = 8352 },
+	{ name = "Oof",                  id = 1321 },
+	{ name = "Yarrrr",               id = 5754 },
+	{ name = "Sigh",                 id = 10579 },
+	{ name = "Shay's Bell",          id = 6555 },
+	{ name = "Alliance Bell",        id = 6594 },
+	{ name = "Horde Bell",           id = 6595 },
+	{ name = "Bell 2",               id = 6674 },
+	{ name = "Drum",                 id = 6675 },
+	{ name = "Alarm Clock",          id = 12867 },
+	{ name = "Warning Bell",         id = 12889 },
+	{ name = "Scourge Male Death",   id = 1318 },
+	{ name = "Scourge Female Death", id = 1364 },
+	{ name = "Bull Whip",            id = 3338 },
+	{ name = "Mother Shahraz",       id = 11510 },
+	{ name = "Captain Skarloc",      id = 10407 },
+	{ name = "C'Thun",               id = 8586 },
+	{ name = "Ossirian",             id = 8594 },
+	{ name = "Horseman",             id = 11976 },
 }
 
-function NS.PlayShameSound()
-    local id = OneJobOwlDB.sound or 0
+function NS.PlaySoundByID(id)
     if id and id > 0 then
         PlaySound(id, "Master")
     end
+end
+
+function NS.PlayShameSound()
+    NS.PlaySoundByID(OneJobOwlDB.sound or 0)
 end
 
 local AUTOHIDE_SECONDS = 10  -- shame button retracts on its own after this long

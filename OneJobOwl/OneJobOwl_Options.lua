@@ -292,12 +292,46 @@ function NS.CreateOptions()
     _G[balloonScaleSlider:GetName() .. "Low"]:SetText("50%")
     _G[balloonScaleSlider:GetName() .. "High"]:SetText("200%")
 
+-- ... inside the "I Am Owl" section ...
+
     local bubbleDurSlider = Slider("OneJobOwlBubbleDurSlider", 3, 15, 1,
         function() return OneJobOwlDB.bubbleDuration or 6 end,
         function(v) return ("Message Duration: %ds"):format(v) end,
         function(v) OneJobOwlDB.bubbleDuration = math.floor(v) end)
     _G[bubbleDurSlider:GetName() .. "Low"]:SetText("3s")
     _G[bubbleDurSlider:GetName() .. "High"]:SetText("15s")
+
+    -- ADD THIS BLOCK:
+    Label("Praise Sound (I Am Owl)")
+    local owlSoundDD = CreateFrame("Frame", "OneJobOwlIamOwlSoundDD", c, "UIDropDownMenuTemplate")
+    owlSoundDD:SetPoint("TOPLEFT", -10, -y)
+    UIDropDownMenu_SetWidth(owlSoundDD, 150)
+    
+    UIDropDownMenu_Initialize(owlSoundDD, function()
+        for _, s in ipairs(NS.sounds) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text, info.value, info.checked = s.name, s.id, (OneJobOwlDB.iamowlSound == s.id)
+            info.func = function(sel)
+                OneJobOwlDB.iamowlSound = sel.value
+                UIDropDownMenu_SetSelectedValue(owlSoundDD, sel.value)
+                UIDropDownMenu_SetText(owlSoundDD, s.name)
+                NS.PlaySoundByID(sel.value) -- Preview
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    UIDropDownMenu_SetSelectedValue(owlSoundDD, OneJobOwlDB.iamowlSound or 0)
+    UIDropDownMenu_SetText(owlSoundDD, (function() 
+        for _, s in ipairs(NS.sounds) do if s.id == (OneJobOwlDB.iamowlSound or 0) then return s.name end end
+        return "None"
+    end)())
+
+    local owlPreviewBtn = CreateFrame("Button", nil, c, "UIPanelButtonTemplate")
+    owlPreviewBtn:SetSize(55, 22)
+    owlPreviewBtn:SetPoint("LEFT", owlSoundDD, "RIGHT", -8, 2)
+    owlPreviewBtn:SetText("Play")
+    owlPreviewBtn:SetScript("OnClick", function() NS.PlaySoundByID(OneJobOwlDB.iamowlSound or 0) end)
+    y = y + 34 + GAP_CONTROL
 
     -- =====================================================================
     Header("Output & Targets")
@@ -580,12 +614,20 @@ function NS.CreateOptions()
         nameInput:SetText(OneJobOwlDB.moonkinName or "")
         UpdateMoonkinStatus()
         UpdateEnemyStatus()
-        -- SetSelectedValue alone doesn't repaint a hidden dropdown's label,
-        -- so set the visible text explicitly too
         UIDropDownMenu_SetSelectedValue(dd, OneJobOwlDB.channel or "WHISPER")
         UIDropDownMenu_SetText(dd, OneJobOwlDB.channel or "WHISPER")
-        UIDropDownMenu_SetSelectedValue(soundDD, OneJobOwlDB.sound or 8959)
+		UIDropDownMenu_SetSelectedValue(soundDD, OneJobOwlDB.sound or 8959)
         UIDropDownMenu_SetText(soundDD, SoundNameForID(OneJobOwlDB.sound or 8959))
+        
+        UIDropDownMenu_SetSelectedValue(owlSoundDD, OneJobOwlDB.iamowlSound or 0)
+        local owlSoundName = "None"
+        for _, s in ipairs(NS.sounds) do 
+            if s.id == (OneJobOwlDB.iamowlSound or 0) then 
+                owlSoundName = s.name 
+                break 
+            end 
+        end
+        UIDropDownMenu_SetText(owlSoundDD, owlSoundName)
         UIDropDownMenu_SetSelectedValue(scopeDD, OneJobOwlDB.trackScope or "BOSS")
         UIDropDownMenu_SetText(scopeDD, ScopeTextFor(OneJobOwlDB.trackScope or "BOSS"))
         UIDropDownMenu_SetSelectedValue(outputDD, OneJobOwlDB.iamowlOutput or "BUBBLE")
