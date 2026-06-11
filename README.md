@@ -1,4 +1,5 @@
-![](https://noobtrap.eu/images/crystallights/Moonkin2.png)
+
+![OneJobOwl](https://noobtrap.eu/images/crystallights/Moonkin2.png)
 
 A Classic WoW (TBC) addon that shames Moonkins for letting **Improved Faerie Fire** fall off, and lets you track your own performance.
 
@@ -7,18 +8,19 @@ A Classic WoW (TBC) addon that shames Moonkins for letting **Improved Faerie Fir
 - **Shame Mode**: Tracks **Faerie Fire** on your target with two modes:
   - **Shame Button** (default) — A moonkin owl appears when IFF drops. Click to shame.
   - **Auto-Shame** — Automatically sends a message (no button).
-- **"I Am Owl" Mode**: Self-tracking mode to grade your own IFF uptime with performance reports.
-- **Customizable Messaging**: Edit and manage your Shame messages.
-- **Support for Whispers/Chat Channels**: Send reports/shames via Whisper, Say, Party, or Raid.
-- **Advanced Tracking**: Watch specific bosses by GUID, configurable sound/thresholds, and tracking scope.
-- **Draggable UI**: Fully draggable shame button with adjustable scale.
+- **"I Am Owl" Mode**: Self-tracking mode to grade your own IFF uptime, efficiency, and refresh timing with performance reports.
+- **Visual Feedback**: A customizable, draggable Owl speech bubble that displays your performance messages in real-time.
+- **Customizable Messaging**: Edit and manage your own Shame or Praise messages.
+- **Audio Alerts**: Configurable sound alerts for both Shame events and "I Am Owl" praise/performance events.
+- **Output Support**: Send reports/shames via Whisper, Say, Party, or Raid.
+- **Advanced Tracking**: Watch specific targets by GUID, configurable sound/thresholds, and tracking scope.
 
 ## Installation
 
-1. Download the latest version
-2. Extract the `OneJobOwl` folder into your `Interface/AddOns/` directory
-3. Restart WoW or type `/reload`
-4. Type `/ojo` to open the options panel
+1. Download the latest version.
+2. Extract the `OneJobOwl` folder into your `Interface/AddOns/` directory.
+3. Restart WoW or type `/reload`.
+4. Type `/ojo` to open the options panel.
 
 ## Slash Commands
 
@@ -38,30 +40,30 @@ A Classic WoW (TBC) addon that shames Moonkins for letting **Improved Faerie Fir
 Open the options panel with `/ojo`:
 
 ### General
-- Enable/disable tracking
-- Mode: Shame Button, Auto-Shame, or **I Am Owl Mode**
-- Track on: Bosses only, Bosses & Elites, or Everything
-
-### Output
-- Channel (Whisper, Raid, Party, Say, Yell)
-- Moonkin name (for whispering)
+- Enable/disable tracking.
+- **Mode**: Choose between Shame Button, Auto-Shame, or **I Am Owl Mode**.
+- **Track Scope**: Configure what units trigger alerts (Bosses only, Elites, etc.).
 
 ### Alerts & Reporting
-- Sound on button pop
-- Warning threshold (seconds remaining)
-- **I Am Owl Report**: Toggle performance scorecard at end of combat
+- **Shame Sound**: Choose a sound to play when the shame button appears.
+- **I Am Owl Sound**: Choose a custom sound to play whenever the owl speaks (Praise/Shame).
+- **Warning Threshold**: Set the seconds remaining before a "clutch" refresh is detected.
+- **I Am Owl Report**: Toggle your end-of-combat performance scorecard.
 
-### Shame Button
-- Unlock to drag
-- Button scale
+### UI & Output
+- **Output Channel**: Choose where to send messages (Whisper, Raid, Party, Say, Yell).
+- **Bubble Settings**: Toggle and configure the visual "I Am Owl" speech bubble (scale, duration, position).
+- **Button Settings**: Drag, scale, and unlock the Shame button.
 
 ### Messages
-- Edit, add, or delete Shame or Praise messages
-- Restore defaults
+- Add, edit, or delete custom Shame or Praise messages.
+- Easily restore default message lists.
 
 ## Notes
 
-- **"I Am Owl" Mode**: When enabled, the addon tallies your uptime, refresh efficiency, and downtime, providing a letter-grade report at the end of combat.
+- **"I Am Owl" Mode**: When active, the addon grades your performance. 
+  - **Clutch Refreshes**: Refreshes performed with low time remaining trigger audio/visual praise.
+  - **Performance Report**: At the end of combat, you receive a detailed summary including uptime percentage, refresh counts, and a final letter grade.
 - All settings are saved per character.
 
 ## Author
