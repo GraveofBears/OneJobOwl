@@ -153,12 +153,17 @@ local totalDowntime  = 0
 local leftoverSum    = 0     -- sum of "seconds left at the moment of refresh"
 local lastPraise     = 0
 
+-- Best name for the encounter: prefer the first boss-classified unit we
+-- scanned this fight; otherwise the last thing we watched.
+local encBossName, encLastName
+
 local function ClearState()
     combatStart, firstApplied   = nil, nil
     ffUp, lastExpiration, downStart = false, nil, nil
     refreshCount, dropCount     = 0, 0
     totalDowntime, leftoverSum  = 0, 0
     lastPraise                  = 0
+    encBossName, encLastName = nil, nil
 end
 
 function NS.IsIamOwlMode()
@@ -254,6 +259,16 @@ function NS.IamOwl_Scan(unit, rem)
     -- Block all live praise once combat is ending
     if not UnitAffectingCombat("player") then return end
 
+    -- Remember who this fight was about, for the report card.
+    local uname = UnitName(unit)
+    if uname then
+        encLastName = uname
+        if not encBossName and (UnitLevel(unit) == -1
+            or UnitClassification(unit) == "worldboss") then
+            encBossName = uname
+        end
+    end
+
     -- FF is on the boss right now.
     local exp = now + rem
 
@@ -323,31 +338,37 @@ function NS.IamOwl_Excuse()
 end
 
 local function GradeFor(score)
-    if score >= 97 then return "S+"
-    elseif score >= 93 then return "S"
-    elseif score >= 88 then return "A+"
-    elseif score >= 83 then return "A"
-    elseif score >= 75 then return "B"
-    elseif score >= 65 then return "C"
+    if score >= 97 then return "S"
+    elseif score >= 90 then return "A+"
+    elseif score >= 85 then return "A"
+    elseif score >= 80 then return "A-"
+    elseif score >= 75 then return "B+"
+    elseif score >= 70 then return "B"
+    elseif score >= 65 then return "B-"
+    elseif score >= 60 then return "C+"
+    elseif score >= 55 then return "C"
     elseif score >= 50 then return "D"
     else return "F" end
 end
 
--- Grade tier colors for the report. S tiers go gold because they're beyond
--- mortal letter grades; A green, B light green, C yellow, D orange, F red.
+-- Updated colors to include all new sub-grades
 local GRADE_COLORS = {
-    ["S+"] = "ffffd700", -- gold
-    ["S"]  = "ffffd700", -- gold
-    ["A+"] = "ff00ff00", -- green
-    ["A"]  = "ff00ff00", -- green
-    ["B"]  = "ffaaff66", -- light green
-    ["C"]  = "ffffff00", -- yellow
-    ["D"]  = "ffff8800", -- orange
-    ["F"]  = "ffff4040", -- red
+    ["S"]  = "ffffd700", -- Gold
+    ["A+"] = "ff00ff00", ["A"]  = "ff00ff00", ["A-"] = "ff00ff00", -- Green
+    ["B+"] = "ffaaff66", ["B"]  = "ffaaff66", ["B-"] = "ffaaff66", -- Light Green
+    ["C+"] = "ffffff00", ["C"]  = "ffffff00", -- Yellow
+    ["D"]  = "ffff8800", -- Orange
+    ["F"]  = "ffff4040", -- Red
 }
 
 local function ColorGrade(text, grade)
     return "|c" .. (GRADE_COLORS[grade] or "ffffffff") .. text .. "|r"
+end
+
+-- Shared with the Report Card module.
+NS.GradeFor = GradeFor
+function NS.GradeColorHex(grade)
+    return GRADE_COLORS[grade] or "ffffffff"
 end
 
 -- Combat end: tally everything and post the report. This is the ONLY place
@@ -367,11 +388,6 @@ function NS.IamOwl_EndCombat()
     if downStart then
         totalDowntime = totalDowntime + (now - downStart)
         downStart = nil
-    end
-
-    if OneJobOwlDB.iamowlReport == false then
-        ClearState()
-        return
     end
 
     if not firstApplied then
@@ -398,10 +414,11 @@ function NS.IamOwl_EndCombat()
         if tight < 0 then tight = 0 elseif tight > 1 then tight = 1 end
         score = uptimePct * 0.85 + tight * 15
     end
-    score = score - dropCount * 2
+
+    score = score - (dropCount * 2) - (totalDowntime * 0.5)
     if score < 0 then score = 0 elseif score > 100 then score = 100 end
 
-    local grade = GradeFor(score)
+	local grade = GradeFor(score)
     local rounded = math.floor(score + 0.5)
     local gradeText = ColorGrade(("Grade %s (%d)"):format(grade, rounded), grade)
 
@@ -420,7 +437,27 @@ function NS.IamOwl_EndCombat()
     -- Report mood follows the GRADE, not a raw score line: B and above gets
     -- the happy owl and green text, C/D/F gets the mad owl and red. (The old
     -- score<80 cutoff sat inside the B band, so a 77 B showed up angry.)
-    local badGrade = (grade == "C" or grade == "D" or grade == "F")
-    OwlSay(report, badGrade)
+    local badGrade = (grade == "C+" or grade == "C" or grade == "D" or grade == "F")
+
+    -- Log this encounter to the session Report Card (shown on group leave)
+    if NS.ReportCard_LogEncounter then
+        NS.ReportCard_LogEncounter({
+            name = encBossName or encLastName or "Unknown foe",
+            zone = (GetRealZoneText and GetRealZoneText()) or "",
+            grade = grade,
+            score = rounded,
+            uptimePct = uptimePct,
+            refreshCount = refreshCount,
+            dropCount = dropCount,
+            downtime = totalDowntime,
+            avgLeftover = avgLeftover,
+            when = time(),
+        })
+    end
+
+    -- The checkbox gates the spoken report (the card auto-show checks it too)
+    if OneJobOwlDB.iamowlReport ~= false then
+        OwlSay(report, badGrade)
+    end
     ClearState()
 end

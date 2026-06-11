@@ -29,6 +29,8 @@
 
 local ADDON_NAME, NS = ...
 
+_G["OneJobOwl"] = NS
+
 -- The debuff on the target is plain Faerie Fire (all ranks, plus the feral
 -- versions). The Improved Faerie Fire TALENT (33600-33602) just makes this
 -- same debuff grant +hit -- it is never itself an aura on the target, which
@@ -131,7 +133,16 @@ function NS.SeedPraises(force)
     end
 end
 
-local function IsMoonkin() return GetShapeshiftForm() == 5 end
+-- "Is this player a druid?" -- the self-tracking gate. This used to check
+-- GetShapeshiftForm() == 5, which is a trap twice over: form INDICES are
+-- bar positions that shift depending on which forms the druid knows (no
+-- Aquatic Form quest = everything moves down one), and a druid applying
+-- Faerie Fire (Feral) from bear/cat -- which our spell table supports --
+-- isn't in form 5 at all. Class is stable for the whole session.
+local function IsDruid()
+    local _, class = UnitClass("player")
+    return class == "DRUID"
+end
 
 function NS.HasMoonkinSet()
     return OneJobOwlDB.moonkinName and OneJobOwlDB.moonkinName ~= ""
@@ -280,8 +291,9 @@ local function CheckIFF(unit)
         return
     end
     -- With a designated moonkin anyone can run the watch (raid lead mode);
-    -- without one, original self-shame behavior: only while YOU are moonkin.
-    if not NS.HasMoonkinSet() and not IsMoonkin() then return end
+    -- without one, original self-shame behavior: only for druids watching
+    -- their own Faerie Fire (any form -- balance or feral).
+    if not NS.HasMoonkinSet() and not IsDruid() then return end
     if not UnitExists(unit) or not UnitCanAttack("player", unit)
         or not UnitIsVisible(unit) then
         -- Untrackable: vanished, flew off, went friendly/immune (boss phase).
@@ -399,8 +411,10 @@ function NS.DebugStatus()
 
     print("  guard chain for current target:")
     P("enabled", OneJobOwlDB.enabled)
-    P("moonkin-or-designated", NS.HasMoonkinSet() or IsMoonkin(),
-        "form=" .. tostring(GetShapeshiftForm()) .. " moonkinName='" .. tostring(OneJobOwlDB.moonkinName) .. "'")
+    P("druid-or-designated", NS.HasMoonkinSet() or IsDruid(),
+        "class=" .. tostring(select(2, UnitClass("player")))
+        .. " form=" .. tostring(GetShapeshiftForm())
+        .. " moonkinName='" .. tostring(OneJobOwlDB.moonkinName) .. "'")
     local unit = "target"
     P("UnitExists", UnitExists(unit))
     if UnitExists(unit) then
@@ -423,8 +437,22 @@ function NS.SetFFEnemyFromTarget()
         print("|cffff8800[OneJobOwl]|r Target a living enemy first, then try again.")
         return false
     end
-    ffEnemy = { guid = UnitGUID("target"), name = UnitName("target") }
-    NS.ResetTargetState()
+
+    local currentGUID = UnitGUID("target")
+    
+    -- Only reset the tracking state if we are targeting a DIFFERENT unit
+    -- than the one we are currently watching.
+    if not ffEnemy or ffEnemy.guid ~= currentGUID then
+        ffEnemy = { guid = currentGUID, name = UnitName("target") }
+        NS.ResetTargetState()
+        
+        -- Success: Print confirmation that we are now watching this unit
+        print("|cffff8800[OneJobOwl]|r Now watching FF on: |cff00ff00" .. ffEnemy.name .. "|r.")
+    else
+        -- Already watching this target
+        print("|cffff8800[OneJobOwl]|r Already watching: |cff00ff00" .. ffEnemy.name .. "|r.")
+    end
+
     -- poll every half second so expiry is caught even if no aura event
     -- happens to fire on a visible unit token at that moment
     if not enemyTicker then
@@ -433,8 +461,7 @@ function NS.SetFFEnemyFromTarget()
             if u then CheckIFF(u) end
         end)
     end
-    print("|cffff8800[OneJobOwl]|r Now watching FF on: " .. ffEnemy.name
-        .. " (clears when combat ends).")
+    
     if NS.RefreshOptions then NS.RefreshOptions() end
     return true
 end
@@ -487,6 +514,7 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         NS.CreateShameButton()
         if NS.CreateOwlBubble then NS.CreateOwlBubble() end
         NS.CreateOptions()
+        if NS.ReportSession_Init then NS.ReportSession_Init() end
         -- /reload mid-fight: PLAYER_REGEN_DISABLED already fired before we
         -- existed, so start the scorecard and heartbeat ourselves.
         if UnitAffectingCombat("player") then
@@ -522,6 +550,8 @@ frame:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "GROUP_ROSTER_UPDATE" then
         -- someone joined/left (or we did): drop the moonkin if they're gone
         NS.CheckMoonkinGroupMembership()
+        -- and let the Report Card track group join/leave for its session
+        if NS.ReportSession_OnRosterUpdate then NS.ReportSession_OnRosterUpdate() end
     end
 end)
 
@@ -587,6 +617,8 @@ SlashCmdList["ONEJOBOWL"] = function(msg)
         NS.SendShame()
     elseif cmd == "debug" then
         NS.DebugStatus()
+    elseif cmd == "card" then
+        if NS.ReportCard_Show then NS.ReportCard_Show(true) end
     elseif cmd == "button" then
         if NS.ShowShameButton then NS.ShowShameButton() end -- preview the button
     elseif cmd == "owl" then
@@ -596,6 +628,15 @@ SlashCmdList["ONEJOBOWL"] = function(msg)
     end
 end
 
+SLASH_OJOCLEAR1 = "/ojoclear"
+SlashCmdList["OJOCLEAR"] = function()
+    if NS.ReportCard_ClearSession then
+        NS.ReportCard_ClearSession()
+        print("|cffff8800[OneJobOwl]|r Session report cleared.")
+    else
+        print("|cffff8800[OneJobOwl]|r Report card module not active.")
+    end
+end
 -- /shame Playername  -> set your moonkin by name
 -- /shame target      -> set your moonkin to your current target (also: /shame %t)
 -- /shame             -> show who's on the hook
