@@ -2,9 +2,12 @@
 -- "I Am Owl" praise mode: the moonkin runs this on themselves and gets graded
 -- on their OWN Faerie Fire discipline during a fight.
 --
---   * Refresh FF before it falls off      -> good. The closer to expiry you
---     cut it (without dropping it), the more efficient -> higher score.
---   * Let FF fall off the boss entirely    -> a "drop" -> instant shame.
+--   * Refresh FF before it falls off      -> good. Refreshing inside your
+--     clutch window (the same window that earns live praise) earns full
+--     tightness credit; the credit decays fast past the window. Perfect
+--     uptime alone is a plain A -- A+ and S are earned with timing.
+--   * Let FF fall off the boss entirely    -> a "drop" -> instant shame,
+--     and it caps the fight's grade (one drop = A- at best).
 --   * End of combat                        -> an after-action report: uptime %,
 --     number of refreshes, total seconds FF was off the boss, and a letter grade.
 --
@@ -151,6 +154,7 @@ local refreshCount   = 0
 local dropCount      = 0
 local totalDowntime  = 0
 local leftoverSum    = 0     -- sum of "seconds left at the moment of refresh"
+local tightSum       = 0     -- sum of per-refresh tightness credit (0..1 each)
 local lastPraise     = 0
 
 -- Best name for the encounter: prefer the first boss-classified unit we
@@ -162,6 +166,7 @@ local function ClearState()
     ffUp, lastExpiration, downStart = false, nil, nil
     refreshCount, dropCount     = 0, 0
     totalDowntime, leftoverSum  = 0, 0
+    tightSum                    = 0
     lastPraise                  = 0
     encBossName, encLastName = nil, nil
 end
@@ -309,6 +314,22 @@ function NS.IamOwl_Scan(unit, rem)
             refreshCount = refreshCount + 1
             leftoverSum = leftoverSum + leftover
 
+            -- Tightness credit for this refresh, 0..1. Inside the clutch
+            -- window = full credit (the same window that triggers live
+            -- praise, so the bubble and the grade agree). Past the window
+            -- the credit decays fast, hitting zero at 1.5x the window.
+            -- Early refreshing is never worse than "no bonus", but the
+            -- bonus itself demands real timing.
+            local tw = TightWindow()
+            local credit
+            if leftover <= tw then
+                credit = 1
+            else
+                credit = 1 - (leftover - tw) / (tw * 0.5)
+                if credit < 0 then credit = 0 end
+            end
+            tightSum = tightSum + credit
+
             -- Clutch refresh praise - only while actively in combat
             local pool = OneJobOwlDB.praises
             if (not pool or #pool == 0) then pool = NS.praiseMessages end
@@ -425,17 +446,30 @@ function NS.IamOwl_EndCombat()
     local uptimePct = math.floor((uptime / span) * 100 + 0.5)
     if totalDowntime > 0.05 and uptimePct >= 100 then uptimePct = 99 end
 
+    -- ===== scoring =====
+    -- Uptime is the job; tightness is the honors track.
+    --   * No refreshes (killed it before FF could expire): pure uptime.
+    --   * With refreshes: uptime carries 88 points, average per-refresh
+    --     tightness credit carries the last 12. Perfect uptime alone is
+    --     a plain A (88) -- job done, no honors. A+ takes decent timing,
+    --     S takes refreshing within about a second of the clutch window.
+    --   * Drops don't nibble the score, they CAP the grade: one drop caps
+    --     you at 84 (A- at best), and every further drop lowers the cap
+    --     by 6. "No drops" is the clean-run requirement for the top shelf.
+    --   * Downtime still bleeds half a point per second on top.
     local score = uptimePct
     local avgLeftover = nil
     if refreshCount > 0 then
         avgLeftover = leftoverSum / refreshCount
-        local tw = TightWindow()
-        local tight = (tw - avgLeftover) / tw
-        if tight < 0 then tight = 0 elseif tight > 1 then tight = 1 end
-        score = uptimePct * 0.85 + tight * 15
+        local tight = tightSum / refreshCount
+        score = uptimePct * 0.88 + tight * 12
     end
 
-    score = score - (dropCount * 2) - (totalDowntime * 0.5)
+    if dropCount > 0 then
+        local cap = 84 - (dropCount - 1) * 6
+        if score > cap then score = cap end
+    end
+    score = score - (totalDowntime * 0.5)
     if score < 0 then score = 0 elseif score > 100 then score = 100 end
 
 	local grade = GradeFor(score)

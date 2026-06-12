@@ -620,6 +620,18 @@ SlashCmdList["ONEJOBOWL"] = function(msg)
         NS.DebugStatus()
     elseif cmd == "card" then
         if NS.ReportCard_Show then NS.ReportCard_Show(true) end
+    elseif cmd == "report" then
+        -- /ojo report          -> open the report card (same as /ojo card)
+        -- /ojo report chat     -> print the session breakdown as chat text
+        -- /ojo report party    -> broadcast a one-line summary (say/party/raid/yell)
+        local arg = msg:match("^%S+%s+(%S+)")
+        if not arg then
+            if NS.ReportCard_Show then NS.ReportCard_Show(true) end
+        elseif arg:lower() == "chat" then
+            if NS.ReportCard_PrintReport then NS.ReportCard_PrintReport(nil) end
+        else
+            if NS.ReportCard_PrintReport then NS.ReportCard_PrintReport(arg) end
+        end
     elseif cmd == "button" then
         if NS.ShowShameButton then NS.ShowShameButton() end -- preview the button
     elseif cmd == "owl" then

@@ -6,7 +6,9 @@
 --     stats). The session starts fresh when you JOIN a group and the card
 --     pops when you LEAVE one, so it naturally covers "that raid".
 --   * The card survives /reload (entries live in SavedVariables) and can
---     be reopened any time with /ojo card.
+--     be reopened any time with /ojo card or /ojo report. /ojo report chat
+--     prints the session as text instead, and /ojo report say|party|raid|yell
+--     broadcasts a one-line summary to the group.
 --   * The "post after-battle report" checkbox gates the card's auto-show
 --     (and the per-fight bubble), so unchecking it silences both.
 --
@@ -62,6 +64,7 @@ function NS.ReportCard_GetSummary()
     if #entries == 0 then return nil end
     local s = { fights = #entries, refreshes = 0, drops = 0, downtime = 0 }
     local scoreSum, uptimeSum = 0, 0
+    local leftoverSum, leftoverRefreshes = 0, 0
     local zones, zoneSeen = {}, {}
     for _, e in ipairs(entries) do
         scoreSum    = scoreSum + (e.score or 0)
@@ -69,6 +72,12 @@ function NS.ReportCard_GetSummary()
         s.refreshes = s.refreshes + (e.refreshCount or 0)
         s.drops     = s.drops + (e.dropCount or 0)
         s.downtime  = s.downtime + (e.downtime or 0)
+        -- weight each fight's avg leftover by its refresh count so the
+        -- session number is the true "avg seconds left at refresh"
+        if e.avgLeftover and (e.refreshCount or 0) > 0 then
+            leftoverSum = leftoverSum + e.avgLeftover * e.refreshCount
+            leftoverRefreshes = leftoverRefreshes + e.refreshCount
+        end
         local z = e.zone
         if z and z ~= "" and not zoneSeen[z] then
             zoneSeen[z] = true
@@ -77,9 +86,83 @@ function NS.ReportCard_GetSummary()
     end
     s.avgScore   = scoreSum / s.fights
     s.avgUptime  = uptimeSum / s.fights
+    if leftoverRefreshes > 0 then
+        s.avgLeftover = leftoverSum / leftoverRefreshes
+    end
     s.finalGrade = NS.GradeFor and NS.GradeFor(s.avgScore) or "?"
     s.zones      = zones
     return s
+end
+
+-- ===== chat report (/ojo report) =====
+-- The session summary as plain chat text -- the report card without the
+-- parchment. No argument prints the full breakdown privately; an argument
+-- of say/party/raid/yell broadcasts a compact one-liner to that channel.
+function NS.ReportCard_PrintReport(channel)
+    local entries = NS.ReportCard_GetEntries()
+    local summary = NS.ReportCard_GetSummary()
+    if not summary then
+        print("|cffff8800[OneJobOwl]|r No graded encounters this session yet.")
+        return
+    end
+
+    local fg = summary.finalGrade
+    local avgScore = math.floor(summary.avgScore + 0.5)
+    local avgUp = math.floor(summary.avgUptime + 0.5)
+    local hex = (NS.GradeColorHex and NS.GradeColorHex(fg)) or "ffffffff"
+
+    if channel and channel ~= "" then
+        channel = channel:upper()
+        -- one compact, color-free line for the group
+        local line = ("[OneJobOwl] Session report: %d fight%s, avg uptime %d%%, %d refresh%s, %d drop%s, %.1fs downtime - Final Grade %s (%d)"):format(
+            summary.fights, summary.fights == 1 and "" or "s",
+            avgUp,
+            summary.refreshes, summary.refreshes == 1 and "" or "es",
+            summary.drops, summary.drops == 1 and "" or "s",
+            summary.downtime, fg, avgScore)
+        if channel == "RAID" then
+            if IsInRaid() then SendChatMessage(line, "RAID")
+            else print("|cffff8800[OneJobOwl]|r You're not in a raid.") end
+        elseif channel == "PARTY" then
+            if IsInGroup() then SendChatMessage(line, "PARTY")
+            else print("|cffff8800[OneJobOwl]|r You're not in a party.") end
+        elseif channel == "SAY" or channel == "YELL" then
+            SendChatMessage(line, channel)
+        else
+            print("|cffff8800[OneJobOwl]|r Unknown channel '" .. channel
+                .. "'. Use: /ojo report [chat | say | party | raid | yell]")
+        end
+        return
+    end
+
+    -- private detailed breakdown, mirroring the parchment
+    print("|cffff8800[OneJobOwl]|r Session report:")
+    for i, e in ipairs(entries) do
+        local ghex = (NS.GradeColorHex and NS.GradeColorHex(e.grade)) or "ffffffff"
+        local bits = { ("%d%% up"):format(e.uptimePct or 0) }
+        local refreshes = e.refreshCount or 0
+        if refreshes > 0 and e.avgLeftover then
+            table.insert(bits, ("%d refresh%s (%.1fs left)"):format(
+                refreshes, refreshes == 1 and "" or "es", e.avgLeftover))
+        else
+            table.insert(bits, ("%d refresh%s"):format(
+                refreshes, refreshes == 1 and "" or "es"))
+        end
+        local drops = e.dropCount or 0
+        if drops > 0 then
+            table.insert(bits, ("%d drop%s"):format(drops, drops == 1 and "" or "s"))
+        end
+        if (e.downtime or 0) > 0.05 then
+            table.insert(bits, ("%.1fs down"):format(e.downtime))
+        end
+        print(("  %d. %s - |c%s%s (%d)|r - %s"):format(
+            i, e.name or "Unknown foe", ghex, e.grade or "?", e.score or 0,
+            table.concat(bits, ", ")))
+    end
+    print(("  Total: avg uptime %d%%, %d refreshes, %d drop%s, %.1fs downtime"):format(
+        avgUp, summary.refreshes,
+        summary.drops, summary.drops == 1 and "" or "s", summary.downtime))
+    print(("  Final Grade: |c%s%s (%d)|r"):format(hex, fg, avgScore))
 end
 
 -- ===== UI =====
@@ -197,6 +280,12 @@ local function BuildCard()
 	finalGrade:SetPoint("TOP", gradeLabel, "BOTTOM", 0, -6)
 	finalGrade:SetShadowOffset(0, 0)
 	card.finalGrade = finalGrade
+
+	-- numeric average score under the big letter, so you can see how far
+	-- from the next grade band the session landed
+	local finalScore = card:CreateFontString(nil, "OVERLAY", "QuestFontNormalSmall")
+	finalScore:SetPoint("TOP", finalGrade, "BOTTOM", 0, -2)
+	card.finalScore = InkText(finalScore)
 end
 
 local function GetRow(i)
@@ -214,15 +303,21 @@ local function GetRow(i)
 
     local stats = row:CreateFontString(nil, "OVERLAY", "QuestFontNormalSmall")
     stats:SetPoint("TOPLEFT", 10, -18)
-    stats:SetWidth(CARD_W - 120)
+    stats:SetWidth(CARD_W - 110)
     stats:SetJustifyH("LEFT")
     stats:SetWordWrap(false)
     stats:SetTextColor(0.35, 0.24, 0.10)
     row.stats = stats
 
     local grade = row:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    grade:SetPoint("RIGHT", -6, 0)
+    grade:SetPoint("TOPRIGHT", -6, -2)
     row.grade = grade
+
+    -- numeric score, small, under the letter grade
+    local score = row:CreateFontString(nil, "OVERLAY", "QuestFontNormalSmall")
+    score:SetPoint("TOP", grade, "BOTTOM", 0, -1)
+    score:SetTextColor(0.35, 0.24, 0.10)
+    row.score = score
 
     card.rows[i] = row
     return row
@@ -249,13 +344,28 @@ local function Populate()
     for i, e in ipairs(entries) do
         local row = GetRow(i)
         row.name:SetText(("%d. %s"):format(i, e.name or "Unknown foe"))
-        local line = ("%d%% up · %d refresh%s · %d drop%s · %.1fs down"):format(
-            e.uptimePct or 0,
-            e.refreshCount or 0, (e.refreshCount == 1) and "" or "es",
-            e.dropCount or 0, (e.dropCount == 1) and "" or "s",
-            e.downtime or 0)
-        row.stats:SetText(line)
+
+        -- Stats line: uptime · refreshes (avg s left at refresh) · drops · downtime.
+        -- The "(Xs left)" bit is WHY a 100% fight isn't an S: the closer to
+        -- expiry you refresh, the more of the 15 tightness points you keep.
+        local refreshes = e.refreshCount or 0
+        local drops = e.dropCount or 0
+        local parts = { ("%d%% up"):format(e.uptimePct or 0) }
+        if refreshes > 0 and e.avgLeftover then
+            table.insert(parts, ("%d refresh%s (%.1fs left)"):format(
+                refreshes, refreshes == 1 and "" or "es", e.avgLeftover))
+        else
+            table.insert(parts, ("%d refresh%s"):format(
+                refreshes, refreshes == 1 and "" or "es"))
+        end
+        table.insert(parts, ("%d drop%s"):format(drops, drops == 1 and "" or "s"))
+        if (e.downtime or 0) > 0.05 then
+            table.insert(parts, ("%.1fs down"):format(e.downtime))
+        end
+        row.stats:SetText(table.concat(parts, " · "))
+
         row.grade:SetText(("|c%s%s|r"):format(GradeHex(e.grade), e.grade or "?"))
+        row.score:SetText(e.score and tostring(e.score) or "")
         row:Show()
     end
     for i = #entries + 1, #card.rows do card.rows[i]:Hide() end
@@ -263,13 +373,19 @@ local function Populate()
 
     card.sum1:SetText(("%d encounter%s graded"):format(
         summary.fights, summary.fights == 1 and "" or "s"))
-    card.sum2:SetText(("avg uptime %d%% · %d refreshes"):format(
-        math.floor(summary.avgUptime + 0.5), summary.refreshes))
+    if summary.avgLeftover then
+        card.sum2:SetText(("avg uptime %d%% · %d refreshes (%.1fs left)"):format(
+            math.floor(summary.avgUptime + 0.5), summary.refreshes, summary.avgLeftover))
+    else
+        card.sum2:SetText(("avg uptime %d%% · %d refreshes"):format(
+            math.floor(summary.avgUptime + 0.5), summary.refreshes))
+    end
     card.sum3:SetText(("%d drop%s · %.1fs total downtime"):format(
         summary.drops, summary.drops == 1 and "" or "s", summary.downtime))
 
 	local fg = summary.finalGrade
     card.finalGrade:SetText(("|c%s%s|r"):format(GradeHex(fg), fg))
+    card.finalScore:SetText(("avg score %d"):format(math.floor(summary.avgScore + 0.5)))
     
     -- UPDATED: C+ is now considered a 'bad' grade to match your threshold
     local badGrade = (fg == "C+" or fg == "C" or fg == "D" or fg == "F")
