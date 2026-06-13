@@ -109,7 +109,6 @@ Uptime is the job. Timing is the honors track.
 | `/ojo button` | Preview the shame button |
 | `/ojo owl` | Preview the owl speech bubble |
 | `/ojo bar` | Toggle the Faerie Fire bar (I Am Owl mode only) |
-| `/ojo card` | Open the session Report Card |
 | `/ojo report` | Open the Report Card |
 | `/ojo report chat` | Print the session breakdown to your chat frame |
 | `/ojo report party` | Broadcast a one-line summary (also: `raid`, `say`, `yell`) |
