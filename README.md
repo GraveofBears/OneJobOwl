@@ -194,4 +194,4 @@ All controls on this tab are disabled and greyed out when a non-I Am Owl mode is
 
 ---
 
-*Enjoy keeping those Moonkins honest — and grading yourself.* 🦉
+*Moonkin Dance* 🦉
