@@ -2,7 +2,8 @@
 ## Title: OneJobOwl
 ## Notes: Tracks Improved Faerie Fire and reminds the owl who had one job.
 ## Author: Gravebear
-## Version: 1.0.5
+## Version: 1.0.6
+## IconTexture: Interface\Icons\Spell_Nature_FaerieFire
 ## SavedVariables: OneJobOwlDB
 
 OneJobOwl_Shames.lua
@@ -10,5 +11,7 @@ OneJobOwl_Button.lua
 OneJobOwl_Bubble.lua
 OneJobOwl.lua
 OneJobOwl_IamOwl.lua
+OneJobOwl_IamOwlMulti.lua
 OneJobOwl_Report.lua
+OneJobOwl_FFBar.lua
 OneJobOwl_Options.lua

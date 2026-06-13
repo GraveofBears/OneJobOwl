@@ -39,6 +39,7 @@ local FF_SPELL_IDS = {
     [770] = true, [778] = true, [9749] = true, [9907] = true, [26993] = true,   -- Faerie Fire r1-r5
     [16857] = true, [17390] = true, [17391] = true, [17392] = true, [27011] = true, -- Faerie Fire (Feral) r1-r5
 }
+NS.FF_SPELL_IDS = FF_SPELL_IDS -- shared with OneJobOwl_FFBar.lua
 
 OneJobOwlDB = OneJobOwlDB or {}
 
@@ -54,13 +55,22 @@ NS.defaults = {
     bubbleScale = 1.0,       -- owl bubble scale (0.5 - 2.0)
 	balloonScale = 1.0,      -- speech bubble + text
     bubbleDuration = 6,      -- seconds a bubble message stays before fading
-    sound = 8959,            -- soundkit ID played when the button appears (8959 = Raid Warning)
+    sound = 5360,            -- soundkit ID played when the shame button appears (5360 = Moonkin Mad)
+    iamowlSound = 5358,      -- soundkit ID for I Am Owl praise (5358 = Moonkin Crit)
     trackScope = "BOSS",     -- "BOSS" (skull only), "ELITE" (bosses+elites), "ALL"
     combatOnly = true,       -- only alert while you are in combat
     buttonPos = nil,         -- saved drag position of the shame button
     buttonScale = 1.0,       -- shame button scale (0.5 - 2.0)
     glowColor = { r = 1, g = 0.2, b = 0.1, a = 0.7 }, -- shame button glow
     tightWindow = 8,         -- I Am Owl: refreshing FF with <= this many seconds left counts as "clutch"
+    ffbarEnabled = false,    -- Faerie Fire bar (per-target FF tracker); needs I Am Owl mode
+    ffbarPos = nil,          -- saved drag position of the FF bar
+    ffbarScale = 1.0,        -- FF bar scale (0.5 - 2.0)
+    ffbarWidth = 190,        -- FF bar row width in pixels (120 - 320)
+    ffbarRowHeight = 20,     -- FF bar row height in pixels (14 - 30)
+    ffbarMaxRows = 8,        -- max display rows beyond target/focus (1 - 15)
+	ffbarRowPadding = 2,	 -- vertical gap between rows (0-12)
+    iamowlMultiTarget = false, -- I Am Owl: grade all FF-tracked mobs, not just current target
     shames = nil,            -- seeded from NS.defaultShames on first load
     praises = nil,           -- seeded from NS.praiseMessages on first load
 }
@@ -267,6 +277,7 @@ function NS.ResetTargetState()
     pendingDrop = nil
     if NS.HideShameButton then NS.HideShameButton() end
     if NS.ResetIamOwlTracking then NS.ResetIamOwlTracking() end
+    if NS.IamOwlMulti_Reset then NS.IamOwlMulti_Reset() end
 end
 
 -- Does the current target matter enough to shame over?
@@ -332,7 +343,13 @@ local function CheckIFF(unit)
     if rem ~= nil then
         -- FF is up: the owl is redeemed. Cancel any pending shame.
         pendingDrop = nil
-        if iamowl and NS.IamOwl_Scan then NS.IamOwl_Scan(unit, rem) end
+        if iamowl then
+            if OneJobOwlDB.iamowlMultiTarget then
+                if NS.IamOwlMulti_Scan then NS.IamOwlMulti_Scan(unit, rem) end
+            else
+                if NS.IamOwl_Scan then NS.IamOwl_Scan(unit, rem) end
+            end
+        end
         iffSeen = true
         if NS.HideShameButton then NS.HideShameButton() end
         return
@@ -345,7 +362,13 @@ local function CheckIFF(unit)
     if gap > PHASE_GAP then
         -- We couldn't track the unit while FF ran out (vanish phase, flight
         -- phase, immunity). Not the owl's fault: forgive and re-arm fresh.
-        if iamowl and NS.IamOwl_Excuse then NS.IamOwl_Excuse() end
+        if iamowl then
+            if OneJobOwlDB.iamowlMultiTarget then
+                if NS.IamOwlMulti_Excuse then NS.IamOwlMulti_Excuse(unit) end
+            else
+                if NS.IamOwl_Excuse then NS.IamOwl_Excuse() end
+            end
+        end
         return
     end
 
@@ -370,7 +393,14 @@ local function CheckIFF(unit)
             or not UnitCanAttack("player", u) or not UnitIsVisible(u) then
             -- Dead, despawned, or phased out between detection and now:
             -- FF "fell off" because the mob stopped existing. Excused.
-            if iamowl and NS.IamOwl_Excuse then NS.IamOwl_Excuse() end
+            if iamowl then
+                if OneJobOwlDB.iamowlMultiTarget then
+                    if NS.IamOwlMulti_Excuse then NS.IamOwlMulti_Excuse(u or unit) end
+                    if NS.IamOwlMulti_MobDied then NS.IamOwlMulti_MobDied(guid) end
+                else
+                    if NS.IamOwl_Excuse then NS.IamOwl_Excuse() end
+                end
+            end
             return
         end
         if GetIFFRemaining(u) ~= nil then
@@ -379,7 +409,11 @@ local function CheckIFF(unit)
         end
         -- Confirmed: living, attackable mob with no Faerie Fire. Shame.
         if iamowl then
-            if NS.IamOwl_Drop then NS.IamOwl_Drop(dropAt) end
+            if OneJobOwlDB.iamowlMultiTarget then
+                if NS.IamOwlMulti_Drop then NS.IamOwlMulti_Drop(u, dropAt) end
+            else
+                if NS.IamOwl_Drop then NS.IamOwl_Drop(dropAt) end
+            end
         else
             Trigger()
         end
@@ -514,12 +548,14 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         NS.SeedPraises(false)
         NS.CreateShameButton()
         if NS.CreateOwlBubble then NS.CreateOwlBubble() end
+        if NS.FFBar_Init then NS.FFBar_Init() end
         NS.CreateOptions()
         if NS.ReportSession_Init then NS.ReportSession_Init() end
         -- /reload mid-fight: PLAYER_REGEN_DISABLED already fired before we
         -- existed, so start the scorecard and heartbeat ourselves.
         if UnitAffectingCombat("player") then
             if NS.IamOwl_StartCombat then NS.IamOwl_StartCombat() end
+            if NS.IamOwlMulti_StartCombat then NS.IamOwlMulti_StartCombat() end
             StartWatchTicker()
         end
     elseif event == "PLAYER_TARGET_CHANGED" then
@@ -540,14 +576,19 @@ frame:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "PLAYER_REGEN_DISABLED" then
         -- combat started: I Am Owl begins a fresh scorecard
         if NS.IamOwl_StartCombat then NS.IamOwl_StartCombat() end
+        if NS.IamOwlMulti_StartCombat then NS.IamOwlMulti_StartCombat() end
         StartWatchTicker()
     elseif event == "PLAYER_REGEN_ENABLED" then
         StopWatchTicker()
         pendingDrop = nil -- combat's over; any unconfirmed drop is moot
         -- combat over: the FF enemy's shift is done
         if ffEnemy then NS.ClearFFEnemy("combat ended") end
-        -- and I Am Owl posts the after-action report
-        if NS.IamOwl_EndCombat then NS.IamOwl_EndCombat() end
+        -- I Am Owl posts the after-action report (only the active module fires)
+        if OneJobOwlDB.iamowlMultiTarget then
+            if NS.IamOwlMulti_EndCombat then NS.IamOwlMulti_EndCombat() end
+        else
+            if NS.IamOwl_EndCombat then NS.IamOwl_EndCombat() end
+        end
     elseif event == "GROUP_ROSTER_UPDATE" then
         -- someone joined/left (or we did): drop the moonkin if they're gone
         NS.CheckMoonkinGroupMembership()
@@ -634,6 +675,12 @@ SlashCmdList["ONEJOBOWL"] = function(msg)
         end
     elseif cmd == "button" then
         if NS.ShowShameButton then NS.ShowShameButton() end -- preview the button
+    elseif cmd == "bar" then
+        -- /ojo bar -> toggle the Faerie Fire bar (requires I Am Owl mode)
+        if NS.FFBar_SetEnabled and NS.FFBar_IsEnabled then
+            NS.FFBar_SetEnabled(not NS.FFBar_IsEnabled())
+            if NS.RefreshOptions then NS.RefreshOptions() end
+        end
     elseif cmd == "owl" then
         if NS.PreviewOwlBubble then NS.PreviewOwlBubble() end -- preview the owl bubble
     else
