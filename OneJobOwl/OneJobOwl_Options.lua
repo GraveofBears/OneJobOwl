@@ -206,7 +206,7 @@ function NS.CreateOptions()
     local outputDD, OutputTextFor, bubblePreviewBtn
     local clutchSlider, owlSoundDD, owlPreviewBtn
     local bubbleMoverCheck, bubbleScaleSlider, balloonScaleSlider, bubbleDurSlider
-    local ffbarCheck, ffbarMoverCheck
+    local ffbarCheck, ffbarMoverCheck, ffbarHeaderCheck
     local ffbarScaleSlider, ffbarWidthSlider, ffbarRowHSlider
     local ffbarPaddingSlider, ffbarMaxRowsSlider
     local owlGateNote
@@ -551,6 +551,12 @@ function NS.CreateOptions()
         end)
         ffbarMoverCheck:SetChecked(false)
         AddOwlWidget(ffbarMoverCheck)
+
+        ffbarHeaderCheck = Check("OneJobOwlFFBarHeader", "Show 'Faerie Fire' title above the bar", function(s)
+            NS.FFBar_SetShowHeader(s:GetChecked() and true or false)
+        end)
+        ffbarHeaderCheck:SetChecked(OneJobOwlDB.ffbarShowHeader ~= false)
+        AddOwlWidget(ffbarHeaderCheck)
 
         ffbarScaleSlider = Slider("OneJobOwlFFBarScaleSlider", 0.5, 2.0, 0.05,
             function() return OneJobOwlDB.ffbarScale or 1 end,
@@ -981,6 +987,7 @@ function NS.CreateOptions()
         if balloonScaleSlider then balloonScaleSlider:SetValue(OneJobOwlDB.balloonScale or 1.0) end
         if bubbleDurSlider    then bubbleDurSlider:SetValue(OneJobOwlDB.bubbleDuration or 6) end
         if clutchSlider       then clutchSlider:SetValue(OneJobOwlDB.tightWindow or 8) end
+        if ffbarHeaderCheck   then ffbarHeaderCheck:SetChecked(OneJobOwlDB.ffbarShowHeader ~= false) end
         if ffbarPaddingSlider then ffbarPaddingSlider:SetValue(OneJobOwlDB.ffbarRowPadding or 2) end
         if ffbarScaleSlider   then ffbarScaleSlider:SetValue(OneJobOwlDB.ffbarScale or 1) end
         if ffbarWidthSlider   then ffbarWidthSlider:SetValue(OneJobOwlDB.ffbarWidth or 190) end
