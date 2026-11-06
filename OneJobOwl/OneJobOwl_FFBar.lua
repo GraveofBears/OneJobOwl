@@ -32,6 +32,10 @@ local pendingLayout, pendingVisibility = false, false
 
 local events = CreateFrame("Frame")
 
+-- Header is optional; the mover always shows it so "DRAG ME" has room.
+local function ShowHeader() return moverMode or (OneJobOwlDB.ffbarShowHeader ~= false) end
+local function HeaderH()   return ShowHeader() and HEADER_H or 0 end
+
 local function FFSpellName()
     return GetSpellInfo(770) or "Faerie Fire"
 end
@@ -155,8 +159,8 @@ local function PaintRow(row, label, remain, missing)
 end
 
 local function RowY(slot)
-    -- The 16 constant determines the distance from the top header
-    return -(16 + (slot - 1) * (RowH() + RowGap()))
+    -- Top offset: below the header when it is shown, else a small inset
+    return -((ShowHeader() and 16 or 3) + (slot - 1) * (RowH() + RowGap()))
 end
 
 local function LayoutSecureRows()
@@ -212,7 +216,7 @@ local function ApplyLayout()
     if not bar then return end
     -- Use RowGap() here so the bar height accounts for your chosen padding
     local totalRows = MaxDyn()
-    bar:SetSize(BarW() + 8, HEADER_H + (1 + totalRows) * (RowH() + RowGap()) + 6)
+    bar:SetSize(BarW() + 8, HeaderH() + (1 + totalRows) * (RowH() + RowGap()) + 6)
 
     for i = 1, math.max(totalRows, #dynRows) do
         if i <= totalRows then
@@ -345,6 +349,8 @@ function NS.FFBar_SetMover(enabled)
         bar:Show()
         bar.backdropTex:Show()
         bar.title:SetText("|cff44ff44DRAG ME|r")
+        bar.title:Show()
+        ApplyLayout()
         moverRows[1]:Show()
         moverRows[2]:Show()
         local d1, d2 = EnsureDynRow(1), EnsureDynRow(2)
@@ -353,6 +359,8 @@ function NS.FFBar_SetMover(enabled)
     else
         bar.backdropTex:Hide()
         bar.title:SetText("Faerie Fire")
+        bar.title:SetShown(OneJobOwlDB.ffbarShowHeader ~= false)
+        ApplyLayout()
         moverRows[1]:Hide()
         moverRows[2]:Hide()
         for _, row in ipairs(dynRows) do
@@ -373,6 +381,15 @@ function NS.FFBar_SetScale(scale)
         bar:SetScale(scale)
         LayoutSecureRows()
     end
+end
+
+function NS.FFBar_SetShowHeader(on)
+    OneJobOwlDB.ffbarShowHeader = on and true or false
+    if bar and not moverMode then
+        bar.title:SetShown(OneJobOwlDB.ffbarShowHeader)
+    end
+    ApplyLayout()
+    LayoutSecureRows()
 end
 
 function NS.FFBar_SetWidth(w)
@@ -443,6 +460,7 @@ function NS.FFBar_Init()
     local title = bar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOPLEFT", 6, -2)
     title:SetText("Faerie Fire")
+    title:SetShown(OneJobOwlDB.ffbarShowHeader ~= false)
     bar.title = title
 
     bar:SetMovable(true)

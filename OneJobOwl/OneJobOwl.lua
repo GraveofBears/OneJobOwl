@@ -68,6 +68,7 @@ NS.defaults = {
     ffbarScale = 1.0,        -- FF bar scale (0.5 - 2.0)
     ffbarWidth = 190,        -- FF bar row width in pixels (120 - 320)
     ffbarRowHeight = 20,     -- FF bar row height in pixels (14 - 30)
+    ffbarShowHeader = true,  -- show the "Faerie Fire" title above the bar
     ffbarMaxRows = 8,        -- max display rows beyond target/focus (1 - 15)
 	ffbarRowPadding = 2,	 -- vertical gap between rows (0-12)
     iamowlMultiTarget = false, -- I Am Owl: grade all FF-tracked mobs, not just current target
